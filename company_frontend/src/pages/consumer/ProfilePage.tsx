@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   Row,
@@ -14,6 +14,7 @@ import {
   Tag,
   List,
   Switch,
+  Spin,
 } from 'antd';
 import {
   UserOutlined,
@@ -28,35 +29,164 @@ import {
   HistoryOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_URL } from '../../config';
 
 const { Title, Text } = Typography;
 
 export const ProfilePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState(true);
   const [form] = Form.useForm();
 
+  // State for API data
+  const [profileData, setProfileData] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null);
+  const [activity, setActivity] = useState<any[]>([]);
+  const [preferences, setPreferences] = useState<any>(null);
+
+  // Fetch all profile data on mount
+  useEffect(() => {
+    fetchProfileData();
+  }, []);
+
+  const fetchProfileData = async () => {
+    if (!token) {
+      setPageLoading(false);
+      return;
+    }
+
+    try {
+      setPageLoading(true);
+
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      };
+
+      // Fetch all data in parallel
+      const [profileRes, statsRes, activityRes, preferencesRes] = await Promise.all([
+        fetch(`${API_URL}/store/customers/me`, { headers }),
+        fetch(`${API_URL}/store/customers/me/stats`, { headers }),
+        fetch(`${API_URL}/store/customers/me/activity`, { headers }),
+        fetch(`${API_URL}/store/customers/me/preferences`, { headers }),
+      ]);
+
+      const profileJson = await profileRes.json();
+      const statsJson = await statsRes.json();
+      const activityJson = await activityRes.json();
+      const preferencesJson = await preferencesRes.json();
+
+      if (profileJson.success) {
+        setProfileData(profileJson.data);
+        // Update form with fetched data
+        form.setFieldsValue({
+          name: profileJson.data.full_name || user?.name,
+          phone: profileJson.data.phone || user?.phone,
+          email: profileJson.data.email || user?.email,
+          address: profileJson.data.address || '',
+          landmark: profileJson.data.landmark || '',
+        });
+      }
+
+      if (statsJson.success) {
+        setStats(statsJson.data);
+      }
+
+      if (activityJson.success) {
+        setActivity(activityJson.data);
+      }
+
+      if (preferencesJson.success) {
+        setPreferences(preferencesJson.data);
+      }
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+      message.error('Failed to load profile data');
+    } finally {
+      setPageLoading(false);
+    }
+  };
+
   const handleSave = async (values: any) => {
+    if (!token) return;
+
     setLoading(true);
     try {
-      // TODO: Call API to update profile
-      console.log('Updating profile:', values);
-      message.success('Profile updated successfully');
-      setEditing(false);
+      const response = await fetch(`${API_URL}/store/customers/me`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          full_name: values.name,
+          email: values.email,
+          address: values.address,
+          landmark: values.landmark,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        message.success('Profile updated successfully');
+        setProfileData(data.data);
+        setEditing(false);
+      } else {
+        message.error(data.error || 'Failed to update profile');
+      }
     } catch (error) {
+      console.error('Error updating profile:', error);
       message.error('Failed to update profile');
     } finally {
       setLoading(false);
     }
   };
 
-  const recentActivity = [
-    { action: 'Placed order #ORD-2024-001', time: '2 hours ago', type: 'order' },
-    { action: 'Added 500 RWF to wallet', time: '1 day ago', type: 'wallet' },
-    { action: 'Completed order #ORD-2024-000', time: '3 days ago', type: 'order' },
-    { action: 'Updated delivery address', time: '1 week ago', type: 'profile' },
-  ];
+  const handlePreferenceChange = async (key: string, value: boolean) => {
+    if (!token) return;
+
+    try {
+      const updatedPreferences = {
+        push_notifications: preferences?.push_notifications,
+        email_notifications: preferences?.email_notifications,
+        sms_notifications: preferences?.sms_notifications,
+        [key]: value,
+      };
+
+      const response = await fetch(`${API_URL}/store/customers/me/preferences`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedPreferences),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setPreferences(data.data);
+        message.success('Preferences updated successfully');
+      } else {
+        message.error(data.error || 'Failed to update preferences');
+      }
+    } catch (error) {
+      console.error('Error updating preferences:', error);
+      message.error('Failed to update preferences');
+    }
+  };
+
+  if (pageLoading) {
+    return (
+      <div style={{ padding: '24px', textAlign: 'center', marginTop: '100px' }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 16 }}>Loading profile...</div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '24px' }}>
@@ -83,14 +213,15 @@ export const ProfilePage: React.FC = () => {
           </Col>
           <Col flex={1}>
             <Title level={2} style={{ color: 'white', margin: 0 }}>
-              {user?.name || 'Consumer'}
+              {profileData?.full_name || user?.name || 'Consumer'}
             </Title>
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 16 }}>
-              <PhoneOutlined /> {user?.phone || '+250788000001'}
+              <PhoneOutlined /> {profileData?.phone || user?.phone || '+250788000001'}
             </Text>
             <div style={{ marginTop: 8 }}>
-              <Tag color="green">Verified Account</Tag>
-              <Tag color="blue">Premium Member</Tag>
+              {profileData?.is_verified && <Tag color="green">Verified Account</Tag>}
+              {profileData?.membership_type === 'premium' && <Tag color="blue">Premium Member</Tag>}
+              {profileData?.membership_type === 'standard' && <Tag color="default">Standard Member</Tag>}
             </div>
           </Col>
           <Col>
@@ -115,13 +246,6 @@ export const ProfilePage: React.FC = () => {
               form={form}
               layout="vertical"
               onFinish={handleSave}
-              initialValues={{
-                name: user?.name || 'Consumer User',
-                phone: user?.phone || '+250788000001',
-                email: user?.email || 'consumer@bigcompany.rw',
-                address: 'Kigali, Nyarugenge District',
-                landmark: 'Near BK Main Branch',
-              }}
             >
               <Row gutter={16}>
                 <Col span={12}>
@@ -185,7 +309,12 @@ export const ProfilePage: React.FC = () => {
           <Card title={<><BellOutlined /> Preferences & Settings</>} style={{ marginTop: 24 }}>
             <List>
               <List.Item
-                actions={[<Switch defaultChecked />]}
+                actions={[
+                  <Switch
+                    checked={preferences?.push_notifications ?? true}
+                    onChange={(checked) => handlePreferenceChange('push_notifications', checked)}
+                  />
+                ]}
               >
                 <List.Item.Meta
                   avatar={<BellOutlined style={{ fontSize: 20, color: '#667eea' }} />}
@@ -194,7 +323,12 @@ export const ProfilePage: React.FC = () => {
                 />
               </List.Item>
               <List.Item
-                actions={[<Switch defaultChecked />]}
+                actions={[
+                  <Switch
+                    checked={preferences?.email_notifications ?? true}
+                    onChange={(checked) => handlePreferenceChange('email_notifications', checked)}
+                  />
+                ]}
               >
                 <List.Item.Meta
                   avatar={<MailOutlined style={{ fontSize: 20, color: '#667eea' }} />}
@@ -203,7 +337,12 @@ export const ProfilePage: React.FC = () => {
                 />
               </List.Item>
               <List.Item
-                actions={[<Switch />]}
+                actions={[
+                  <Switch
+                    checked={preferences?.sms_notifications ?? false}
+                    onChange={(checked) => handlePreferenceChange('sms_notifications', checked)}
+                  />
+                ]}
               >
                 <List.Item.Meta
                   avatar={<PhoneOutlined style={{ fontSize: 20, color: '#667eea' }} />}
@@ -223,14 +362,18 @@ export const ProfilePage: React.FC = () => {
               <Col span={12}>
                 <div style={{ textAlign: 'center', padding: '16px 0' }}>
                   <Text type="secondary">Total Orders</Text>
-                  <Title level={2} style={{ margin: '8px 0 0', color: '#667eea' }}>42</Title>
+                  <Title level={2} style={{ margin: '8px 0 0', color: '#667eea' }}>
+                    {stats?.total_orders ?? 0}
+                  </Title>
                   <Text type="secondary" style={{ fontSize: 12 }}>Online + Shop Orders</Text>
                 </div>
               </Col>
               <Col span={12}>
                 <div style={{ textAlign: 'center', padding: '16px 0' }}>
                   <Text type="secondary">Available Balance</Text>
-                  <Title level={4} style={{ margin: '8px 0 0', color: '#52c41a' }}>30,000 RWF</Title>
+                  <Title level={4} style={{ margin: '8px 0 0', color: '#52c41a' }}>
+                    {stats?.wallet_balance?.toLocaleString() ?? 0} RWF
+                  </Title>
                   <Text type="secondary" style={{ fontSize: 12 }}>Dashboard + Credit</Text>
                 </div>
               </Col>
@@ -240,7 +383,9 @@ export const ProfilePage: React.FC = () => {
               <Col span={24}>
                 <div style={{ textAlign: 'center', padding: '16px 0' }}>
                   <Text type="secondary">Gas Rewards</Text>
-                  <Title level={3} style={{ margin: '8px 0 0', color: '#fa8c16' }}>4.5 M³</Title>
+                  <Title level={3} style={{ margin: '8px 0 0', color: '#fa8c16' }}>
+                    {stats?.gas_rewards?.toFixed(1) ?? 0} M³
+                  </Title>
                   <Text type="secondary" style={{ fontSize: 12 }}>Cubic Meters</Text>
                 </div>
               </Col>
@@ -266,7 +411,8 @@ export const ProfilePage: React.FC = () => {
           <Card title={<><HistoryOutlined /> Recent Activity</>} style={{ marginTop: 24 }}>
             <List
               size="small"
-              dataSource={recentActivity}
+              dataSource={activity}
+              locale={{ emptyText: 'No recent activity' }}
               renderItem={(item) => (
                 <List.Item>
                   <List.Item.Meta

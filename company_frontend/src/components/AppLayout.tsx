@@ -44,18 +44,7 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
     { key: 'rewards', icon: <GiftOutlined />, label: 'Rewards', path: '/consumer/rewards', mobileLabel: 'Rewards' },
     { key: 'profile', icon: <UserOutlined />, label: 'Profile', path: '/consumer/profile', mobileLabel: 'Profile' },
   ],
-  employee: [
-    { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/employee/dashboard', mobileLabel: 'Home' },
-    { key: 'attendance', icon: <ClockCircleOutlined />, label: 'Attendance', path: '/employee/attendance', mobileLabel: 'Attendance' },
-    { key: 'leave', icon: <CalendarOutlined />, label: 'Leave', path: '/employee/leave', mobileLabel: 'Leave' },
-    { key: 'payslips', icon: <DollarOutlined />, label: 'Payslips', path: '/employee/payslips', mobileLabel: 'Payslips' },
-    { key: 'bill-payments', icon: <CreditCardOutlined />, label: 'Bill Payments', path: '/employee/bill-payments', mobileLabel: 'Bills' },
-    { key: 'projects', icon: <ProjectOutlined />, label: 'Projects', path: '/employee/projects', mobileLabel: 'Projects' },
-    { key: 'training', icon: <BookOutlined />, label: 'Training', path: '/employee/training', mobileLabel: 'Training' },
-    { key: 'expense-claims', icon: <FileTextOutlined />, label: 'Expense Claims', path: '/employee/expense-claims', mobileLabel: 'Expenses' },
-    { key: 'performance-reviews', icon: <TrophyOutlined />, label: 'Performance', path: '/employee/performance-reviews', mobileLabel: 'Reviews' },
-    { key: 'profile', icon: <UserOutlined />, label: 'Profile', path: '/employee/profile', mobileLabel: 'Profile' },
-  ],
+  employee: [],
   retailer: [
     { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/retailer/dashboard', mobileLabel: 'Home' },
     { key: 'pos', icon: <ScanOutlined />, label: 'POS', path: '/retailer/pos', mobileLabel: 'POS' },
@@ -95,7 +84,7 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
 // NOTE: Consumer has 'orders' instead of 'rewards' as per requirement
 const mobileBottomNavItems: Record<UserRole, string[]> = {
   consumer: ['shop', 'orders', 'wallet', 'gas', 'profile'],
-  employee: ['dashboard', 'attendance', 'projects', 'payslips', 'profile'],
+  employee: ['attendance', 'projects', 'payslips', 'profile'],
   retailer: ['dashboard', 'pos', 'orders', 'wallet', 'management'],
   wholesaler: ['dashboard', 'orders', 'retailers', 'wallet', 'management'],
   admin: ['dashboard', 'employees', 'payroll', 'accounts', 'customers'],

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { MOCK_DATA } from "./mockData";
+
 
 import { API_URL } from "../config";
 
@@ -20,162 +20,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-const FORCE_MOCK = false;
-
-// Helper to get mock data based on URL and method
-const getMockResponse = (url: string = "", method: string = "get") => {
-  const normalizedUrl = url.toLowerCase();
-  console.warn(`[MOCK MODE] Intercepting ${method.toUpperCase()} ${url}`);
-
-  if (method === "get") {
-    // ADMIN MOCKS
-    if (normalizedUrl.includes("/admin/dashboard"))
-      return { data: { success: true, ...MOCK_DATA.admin.dashboard } };
-    if (normalizedUrl.includes("/admin/retailers"))
-      return { data: { success: true, retailers: MOCK_DATA.admin.retailers } };
-    if (normalizedUrl.includes("/admin/wholesalers"))
-      return {
-        data: { success: true, wholesalers: MOCK_DATA.admin.wholesalers },
-      };
-    if (normalizedUrl.includes("/admin/customers"))
-      return { data: { success: true, customers: MOCK_DATA.admin.customers } };
-    if (normalizedUrl.includes("/admin/loans"))
-      return { data: { success: true, loans: MOCK_DATA.admin.loans } };
-    if (normalizedUrl.includes("/admin/nfc-cards"))
-      return { data: { success: true, cards: MOCK_DATA.admin.nfc_cards } };
-    if (normalizedUrl.includes("/admin/categories"))
-      return {
-        data: { success: true, categories: MOCK_DATA.admin.categories },
-      };
-    if (normalizedUrl.includes("/admin/audit-logs"))
-      return { data: { success: true, logs: [] } };
-    if (normalizedUrl.includes("/admin/reports"))
-      return {
-        data: {
-          success: true,
-          summary: MOCK_DATA.admin.dashboard,
-          salesData: [],
-        },
-      };
-
-    // WHOLESALER MOCKS
-    if (normalizedUrl.includes("/wholesaler/dashboard/stats"))
-      return { data: MOCK_DATA.wholesaler.stats };
-    if (normalizedUrl.includes("/wholesaler/inventory"))
-      return {
-        data: {
-          products: MOCK_DATA.wholesaler.inventory,
-          count: MOCK_DATA.wholesaler.inventory.length,
-        },
-      };
-    if (normalizedUrl.includes("/wholesaler/retailer-orders"))
-      return {
-        data: {
-          orders: MOCK_DATA.wholesaler.orders,
-          count: MOCK_DATA.wholesaler.orders.length,
-        },
-      };
-    if (normalizedUrl.includes("/wholesaler/credit-requests"))
-      return { data: { requests: MOCK_DATA.wholesaler.credit_requests } };
-
-    // RETAILER MOCKS
-    if (normalizedUrl.includes("/retailer/dashboard/stats"))
-      return { data: MOCK_DATA.retailer.stats };
-    if (normalizedUrl.includes("/retailer/inventory"))
-      return { data: { products: MOCK_DATA.retailer.inventory } };
-    if (normalizedUrl.includes("/retailer/orders"))
-      return { data: { orders: MOCK_DATA.retailer.orders } };
-    if (normalizedUrl.includes("/retailer/branches"))
-      return { data: { branches: MOCK_DATA.retailer.branches } };
-
-    // EMPLOYEE MOCKS
-    if (normalizedUrl.includes("/employee/dashboard"))
-      return { data: MOCK_DATA.employee.dashboard };
-    if (normalizedUrl.includes("/employee/attendance"))
-      return { data: { attendance: MOCK_DATA.employee.attendance } };
-    if (normalizedUrl.includes("/employee/payslips"))
-      return { data: { payslips: MOCK_DATA.employee.payslips } };
-    if (normalizedUrl.includes("/employee/tasks"))
-      return { data: { tasks: MOCK_DATA.employee.tasks } };
-
-    // CONSUMER MOCKS
-    if (normalizedUrl.includes("/store/retailers"))
-      return { data: { retailers: MOCK_DATA.consumer.retailers } };
-    if (normalizedUrl.includes("/store/products"))
-      return { data: { products: MOCK_DATA.consumer.products } };
-    if (normalizedUrl.includes("/store/categories"))
-      return { data: { categories: MOCK_DATA.consumer.categories } };
-    if (normalizedUrl.includes("/store/customers/me/orders"))
-      return { data: { orders: MOCK_DATA.consumer.orders } };
-    if (normalizedUrl.includes("/store/customers/me/wallet"))
-      return { data: MOCK_DATA.consumer.wallet };
-    if (normalizedUrl.includes("/store/rewards/balance"))
-      return { data: MOCK_DATA.consumer.rewards };
-    if (normalizedUrl.includes("/store/wallet/balance"))
-      return { data: MOCK_DATA.consumer.wallet };
-    if (normalizedUrl.includes("/store/wallet/transactions"))
-      return { data: { transactions: MOCK_DATA.consumer.wallet.transactions } };
-
-    // CONSUMER LOAN MOCKS
-    if (normalizedUrl.includes("/store/loans/products"))
-      return {
-        data: {
-          products: [
-            {
-              id: "lp_1",
-              name: "Emergency Food Loan",
-              min_amount: 1000,
-              max_amount: 5000,
-              interest_rate: 0,
-              term_days: 7,
-              loan_type: "food",
-            },
-            {
-              id: "lp_2",
-              name: "Personal Cash Loan",
-              min_amount: 5000,
-              max_amount: 20000,
-              interest_rate: 0.1,
-              term_days: 30,
-              loan_type: "cash",
-            },
-          ],
-        },
-      };
-    if (normalizedUrl.includes("/store/loans/eligibility"))
-      return {
-        data: { eligible: true, credit_score: 65, max_eligible_amount: 15000 },
-      };
-    if (normalizedUrl.includes("/store/loans")) {
-      if (normalizedUrl.match(/\/store\/loans\/[^\/]+$/))
-        return { data: { loan: MOCK_DATA.admin.loans[1] } };
-      return {
-        data: {
-          loans: [MOCK_DATA.admin.loans[1]],
-          summary: { total_outstanding: 25000 },
-        },
-      };
-    }
-    if (normalizedUrl.includes("/store/loans/food-credit"))
-      return { data: { available_credit: 3500 } };
-
-    // Default empty state
-    return { data: { success: true, items: [], total: 0 } };
-  }
-  return { data: { success: true, message: "Mock Action Successful" } };
-};
-
-// Overwrite axios methods to prevent any network activity if FORCE_MOCK is true
-if (FORCE_MOCK) {
-  api.get = (url: string) =>
-    Promise.resolve(getMockResponse(url, "get")) as any;
-  api.post = (url: string) =>
-    Promise.resolve(getMockResponse(url, "post")) as any;
-  api.put = (url: string) =>
-    Promise.resolve(getMockResponse(url, "put")) as any;
-  api.delete = (url: string) =>
-    Promise.resolve(getMockResponse(url, "delete")) as any;
-}
 
 // Handle 401 responses and API errors (only relevant if FORCE_MOCK is false)
 api.interceptors.response.use(
@@ -248,40 +92,46 @@ export const consumerApi = {
     api.get("/store/customers/me/orders", { params }),
   getOrder: (id: string) => api.get(`/store/customers/me/orders/${id}`),
   trackOrder: (id: string) => api.get(`/store/customers/me/orders/${id}/track`),
+  cancelOrder: (id: string, reason: string) => api.post(`/store/orders/${id}/cancel`, { reason }),
+  confirmDelivery: (id: string) => api.post(`/store/orders/${id}/confirm-delivery`),
+  createOrder: (data: { retailerId: string; items: any[]; paymentMethod: string; total: number }) => api.post('/store/orders', data),
 
   // Wallet
-  getWallet: () => api.get("/store/wallet/balance"),
+  getWallet: () => api.get("/store/wallet/balance"), // Legacy route
+  getWallets: () => api.get("/store/wallets"), // Get all wallets (dashboard + credit)
+  topupWallet: (data: { amount: number; payment_method: string }) =>
+    api.post("/store/wallets/topup", data),
+  requestRefund: (data: any) => api.post("/store/wallets/refund-request", data),
   getWalletTransactions: (params?: any) =>
-    api.get("/store/wallet/transactions", { params }),
+    api.get("/store/wallets/transactions", { params }),
 
   // Gas Service
   getGasMeters: () => api.get("/store/gas/meters"),
-  registerGasMeter: (meterNumber: string, alias: string) =>
-    api.post("/store/gas/register-meter", { meter_number: meterNumber, alias }),
-  topUpGas: (meterNumber: string, amount: number, paymentMethod: string) =>
-    api.post("/store/gas/topup", {
-      meter_number: meterNumber,
-      amount,
-      payment_method: paymentMethod,
-    }),
-  getGasHistory: () => api.get("/store/gas/history"),
+  addGasMeter: (data: { meter_number: string; alias_name: string; owner_name: string; owner_phone: string }) =>
+    api.post("/store/gas/meters", data),
+  removeGasMeter: (id: string) => api.delete(`/store/gas/meters/${id}`),
+  topupGas: (data: { meter_number: string; amount: number; payment_method: string }) =>
+    api.post("/store/gas/topup", data),
+  getGasHistory: () => api.get("/store/gas/usage"),
 
   // Rewards
-  getRewardsBalance: () => api.get("/store/rewards/balance"),
+  getRewardsBalance: () => api.get("/store/gas/rewards/balance"),
   getRewardsHistory: (limit?: number) =>
-    api.get("/store/rewards/history", { params: { limit } }),
+    api.get("/store/gas/rewards/history", { params: { limit } }),
   redeemRewards: (points: number) =>
     api.post("/store/rewards/redeem", { points }),
   getReferralCode: () => api.get("/store/rewards/referral-code"),
   applyReferralCode: (code: string) =>
     api.post("/store/rewards/apply-referral", { code }),
   getLeaderboard: (period: "week" | "month" | "all") =>
-    api.get("/store/rewards/leaderboard", { params: { period } }),
+    api.get("/store/gas/rewards/leaderboard", { params: { period } }),
 
   // Loans
   getLoanProducts: () => api.get("/store/loans/products"),
   checkLoanEligibility: () => api.get("/store/loans/eligibility"),
   getLoans: () => api.get("/store/loans"),
+  getActiveLoanLedger: () => api.get('/store/loans/active'),
+  getCreditTransactions: () => api.get('/store/loans/transactions'),
   getLoanDetails: (id: string) => api.get(`/store/loans/${id}`),
   applyForLoan: (data: {
     loan_product_id: string;
