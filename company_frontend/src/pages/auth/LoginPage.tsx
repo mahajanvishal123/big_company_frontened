@@ -127,7 +127,7 @@ const roleConfig: Record<PublicUserRole, {
     borderColor: 'border-amber-200',
     textColor: 'text-amber-700',
     buttonColor: 'bg-amber-600 hover:bg-amber-700',
-    redirect: '/employee/dashboard',
+    redirect: '/employee/attendance',
     authType: 'email' as const,
     credentials: { phone: '', pin: '', email: 'employee@bigcompany.rw', password: 'employee123' },
   },
@@ -203,7 +203,7 @@ export const LoginPage: React.FC = () => {
   // Get role from URL or default to consumer
   const urlRole = searchParams.get('role');
   // Only allow public roles - admin uses separate internal auth
-  const validPublicRoles: PublicUserRole[] = ['consumer', 'employee', 'retailer', 'wholesaler', 'admin'];
+  const validPublicRoles: PublicUserRole[] = ['consumer', 'retailer', 'wholesaler', 'admin'];
   const initialRole: PublicUserRole = validPublicRoles.includes(urlRole as PublicUserRole)
     ? (urlRole as PublicUserRole)
     : 'consumer';
@@ -321,7 +321,7 @@ export const LoginPage: React.FC = () => {
 
           {/* Role Selection Tabs */}
           <div className="flex border-b border-gray-200">
-            {(['consumer', 'employee', 'retailer', 'wholesaler', 'admin'] as PublicUserRole[]).map((role) => (
+            {(['consumer', 'retailer', 'wholesaler', 'admin'] as PublicUserRole[]).map((role) => (
               <button
                 key={role}
                 onClick={() => setActiveRole(role)}

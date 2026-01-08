@@ -23,21 +23,7 @@ import CreditLedgerPage from './pages/consumer/CreditLedgerPage';
 import CreditTransactionsPage from './pages/consumer/CreditTransactionsPage';
 
 // Employee Pages
-import EmployeeDashboardPage from './pages/employee/DashboardPage';
-import AttendancePage from './pages/employee/AttendancePage';
-import AttendanceDetailsPage from './pages/employee/AttendanceDetailsPage';
-import LeavePage from './pages/employee/LeavePage';
-import PayslipsPage from './pages/employee/PayslipsPage';
-import BillPaymentsPage from './pages/employee/BillPaymentsPage';
-import EmployeeProfilePage from './pages/employee/EmployeeProfilePage';
-import ProjectsPage from './pages/employee/ProjectsPage';
-import ProjectDetailsPage from './pages/employee/ProjectDetailsPage';
-import TrainingPage from './pages/employee/TrainingPage';
-import TrainingDetailsPage from './pages/employee/TrainingDetailsPage';
-import ExpenseClaimsPage from './pages/employee/ExpenseClaimsPage';
-import ExpenseClaimDetailsPage from './pages/employee/ExpenseClaimDetailsPage';
-import PerformanceReviewsPage from './pages/employee/PerformanceReviewsPage';
-import PerformanceReviewDetailsPage from './pages/employee/PerformanceReviewDetailsPage';
+
 
 // Retailer Pages
 import { RetailerDashboard } from './pages/retailer/RetailerDashboard';
@@ -125,8 +111,8 @@ function App() {
               <Route path="profile" element={<ConsumerProfilePage />} />
             </Route>
 
-            {/* Employee Routes */}
-            <Route
+            {/* Employee Routes - DELETED */}
+            {/* <Route
               path="/employee"
               element={
                 <ProtectedRoute allowedRoles={['employee']}>
@@ -134,23 +120,8 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/employee/dashboard" replace />} />
-              <Route path="dashboard" element={<EmployeeDashboardPage />} />
-              <Route path="attendance" element={<AttendancePage />} />
-              <Route path="attendance/:id" element={<AttendanceDetailsPage />} />
-              <Route path="leave" element={<LeavePage />} />
-              <Route path="payslips" element={<PayslipsPage />} />
-              <Route path="bill-payments" element={<BillPaymentsPage />} />
-              <Route path="projects" element={<ProjectsPage />} />
-              <Route path="projects/:id" element={<ProjectDetailsPage />} />
-              <Route path="training" element={<TrainingPage />} />
-              <Route path="training/:id" element={<TrainingDetailsPage />} />
-              <Route path="expense-claims" element={<ExpenseClaimsPage />} />
-              <Route path="expense-claims/:id" element={<ExpenseClaimDetailsPage />} />
-              <Route path="performance-reviews" element={<PerformanceReviewsPage />} />
-              <Route path="performance-reviews/:id" element={<PerformanceReviewDetailsPage />} />
-              <Route path="profile" element={<EmployeeProfilePage />} />
-            </Route>
+              <Route index element={<Navigate to="/" replace />} />
+            </Route> */}
 
             {/* Retailer Routes */}
             <Route
