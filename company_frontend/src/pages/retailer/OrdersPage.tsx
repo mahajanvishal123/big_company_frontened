@@ -651,7 +651,118 @@ export const OrdersPage = () => {
         open={viewModal.visible}
         onCancel={() => setViewModal({ visible: false, order: null })}
         footer={[
-          <Button key="print" icon={<PrinterOutlined />} onClick={() => window.print()}>
+          <Button key="print" icon={<PrinterOutlined />} onClick={() => {
+            if (!viewModal.order) return;
+
+            const printWindow = window.open('', '_blank');
+            if (!printWindow) {
+              message.error('Please allow popups to print');
+              return;
+            }
+
+            const order = viewModal.order;
+
+            const htmlContent = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>Order Receipt #${order.display_id || order.id.substring(0, 8)}</title>
+                <style>
+                  body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 20px; color: #333; }
+                  .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #eee; padding-bottom: 20px; }
+                  .company-name { font-size: 24px; font-weight: bold; margin: 0; }
+                  .receipt-title { font-size: 16px; color: #666; margin: 5px 0 0 0; }
+                  .info-grid { display: flex; justify-content: space-between; margin-bottom: 30px; }
+                  .info-group { flex: 1; }
+                  .label { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+                  .value { font-size: 14px; font-weight: 500; margin-top: 4px; }
+                  .right-align { text-align: right; }
+                  
+                  table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                  th { text-align: left; border-bottom: 1px solid #ddd; padding: 10px 0; font-size: 12px; text-transform: uppercase; color: #666; }
+                  td { border-bottom: 1px solid #f5f5f5; padding: 12px 0; font-size: 14px; }
+                  .total-row td { border-bottom: none; border-top: 2px solid #333; font-weight: bold; font-size: 16px; padding-top: 15px; }
+                  .subtotal-row td { border-bottom: none; color: #666; padding-top: 5px; padding-bottom: 5px; }
+                  
+                  .footer { text-align: center; margin-top: 50px; border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #999; }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <h1 class="company-name">BIG Company Rwanda</h1>
+                  <p class="receipt-title">Order Receipt</p>
+                </div>
+
+                <div class="info-grid">
+                  <div class="info-group">
+                    <div class="label">Customer</div>
+                    <div class="value">${order.customer_name}</div>
+                    <div class="value">${order.customer_phone}</div>
+                  </div>
+                  <div class="info-group right-align">
+                    <div class="label">Order Details</div>
+                    <div class="value">#${order.display_id || order.id.substring(0, 8)}</div>
+                    <div class="value">${new Date(order.created_at).toLocaleDateString()} ${new Date(order.created_at).toLocaleTimeString()}</div>
+                    <div class="value" style="margin-top: 5px;">
+                      <span style="background: #f0f0f0; padding: 2px 6px; border-radius: 4px; font-size: 12px;">${order.payment_method.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <table>
+                  <thead>
+                    <tr>
+                      <th style="width: 50%">Item</th>
+                      <th style="width: 15%; text-align: center;">Qty</th>
+                      <th style="width: 15%; text-align: right;">Price</th>
+                      <th style="width: 20%; text-align: right;">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${order.items.map(item => `
+                      <tr>
+                        <td>
+                          <div style="font-weight: 500;">${item.product_name}</div>
+                          <div style="font-size: 11px; color: #888;">SKU: ${item.sku || 'N/A'}</div>
+                        </td>
+                        <td style="text-align: center;">${item.quantity}</td>
+                        <td style="text-align: right;">${item.unit_price.toLocaleString()}</td>
+                        <td style="text-align: right;">${item.total.toLocaleString()} RWF</td>
+                      </tr>
+                    `).join('')}
+                    
+                    <tr class="subtotal-row">
+                      <td colspan="3" style="text-align: right;">Subtotal</td>
+                      <td style="text-align: right;">${order.subtotal?.toLocaleString()} RWF</td>
+                    </tr>
+                    ${order.discount ? `
+                    <tr class="subtotal-row">
+                      <td colspan="3" style="text-align: right; color: #52c41a;">Discount</td>
+                      <td style="text-align: right; color: #52c41a;">-${order.discount.toLocaleString()} RWF</td>
+                    </tr>
+                    ` : ''}
+                    <tr class="total-row">
+                      <td colspan="3" style="text-align: right;">Total</td>
+                      <td style="text-align: right;">${order.total.toLocaleString()} RWF</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div class="footer">
+                  <p>Thank you for your business!</p>
+                  <p>BIG Company Rwanda Distribution Platform</p>
+                </div>
+                
+                <script>
+                  window.onload = function() { window.print(); window.close(); }
+                </script>
+              </body>
+              </html>
+            `;
+
+            printWindow.document.write(htmlContent);
+            printWindow.document.close();
+          }}>
             Print
           </Button>,
           <Button key="close" onClick={() => setViewModal({ visible: false, order: null })}>
@@ -676,6 +787,7 @@ export const OrdersPage = () => {
                   { title: 'Ready' },
                   { title: 'Completed' },
                 ]}
+                className="no-print"
               />
             )}
 
@@ -689,7 +801,7 @@ export const OrdersPage = () => {
               </div>
             )}
 
-            <Descriptions column={2} size="small" style={{ marginBottom: 24 }}>
+            <Descriptions column={2} size="small" style={{ marginBottom: 24 }} className="no-print">
               <Descriptions.Item label="Customer">{viewModal.order.customer_name}</Descriptions.Item>
               <Descriptions.Item label="Phone">{viewModal.order.customer_phone}</Descriptions.Item>
               <Descriptions.Item label="Payment">

@@ -79,11 +79,6 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
   ],
   admin: [
     { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/admin/dashboard', mobileLabel: 'Home' },
-    { key: 'employees', icon: <TeamOutlined />, label: 'Employees', path: '/admin/employees', mobileLabel: 'Employees' },
-    { key: 'payroll', icon: <DollarOutlined />, label: 'Payroll', path: '/admin/payroll', mobileLabel: 'Payroll' },
-    { key: 'recruitment', icon: <UserAddOutlined />, label: 'Recruitment', path: '/admin/recruitment', mobileLabel: 'Jobs' },
-    { key: 'vendors', icon: <ShopOutlined />, label: 'Vendors', path: '/admin/vendors', mobileLabel: 'Vendors' },
-    { key: 'deals', icon: <RocketOutlined />, label: 'Deals', path: '/admin/deals', mobileLabel: 'Deals' },
     { key: 'accounts', icon: <TeamOutlined />, label: 'Account Management', path: '/admin/accounts', mobileLabel: 'Accounts' },
     { key: 'categories', icon: <ApartmentOutlined />, label: 'Categories', path: '/admin/categories', mobileLabel: 'Categories' },
     { key: 'customers', icon: <UserOutlined />, label: 'Customers', path: '/admin/customers', mobileLabel: 'Users' },
