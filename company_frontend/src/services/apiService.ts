@@ -1,9 +1,7 @@
 import axios from "axios";
 import { MOCK_DATA } from "./mockData";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://big-pos-backend-production.up.railway.app";
+import { API_URL } from "../config";
 
 // Create axios instance with auth interceptor
 const api = axios.create({

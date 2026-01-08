@@ -1,8 +1,6 @@
 import axios from "axios";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  "https://big-pos-backend-production.up.railway.app";
+import { API_URL } from "../config";
 
 const getAuthHeader = () => {
   const token = localStorage.getItem("bigcompany_token");
@@ -21,12 +19,12 @@ export interface Deal {
   clientName: string;
   value: number;
   stage:
-    | "lead"
-    | "qualified"
-    | "proposal"
-    | "negotiation"
-    | "closed_won"
-    | "closed_lost";
+  | "lead"
+  | "qualified"
+  | "proposal"
+  | "negotiation"
+  | "closed_won"
+  | "closed_lost";
   probability: number;
   owner: string;
   expectedCloseDate?: string;
