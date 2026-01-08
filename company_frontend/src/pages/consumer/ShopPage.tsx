@@ -112,36 +112,19 @@ export const ShopPage: React.FC = () => {
 
   const formatPrice = (amount: number) => `${amount.toLocaleString()} RWF`;
 
-  const getMockRetailers = (): Retailer[] => [
-    { id: 'ret_001', name: 'Remera Express Store', location: 'Rukiri I, Remera, Gasabo', rating: 4.8, distance: 1.2, is_open: true, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&q=80&w=800', delivery_time: '20-30 min', minimum_order: 5000 },
-    { id: 'ret_002', name: 'Nyamirambo Market', location: 'Nyamirambo, Nyarugenge', rating: 4.5, distance: 2.5, is_open: true, image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&q=80&w=800', delivery_time: '30-45 min', minimum_order: 3000 },
-    { id: 'ret_005', name: 'Gikondo Groceries', location: 'Gikondo, Kicukiro', rating: 4.3, distance: 5.5, is_open: true, image: 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?auto=format&fit=crop&q=80&w=800', delivery_time: '35-50 min', minimum_order: 4500 }
-  ];
 
-  const getMockCategories = (): Category[] => [
-    { id: 'cat_1', name: 'Fruits', handle: 'fruits' },
-    { id: 'cat_2', name: 'Vegetables', handle: 'vegetables' },
-    { id: 'cat_3', name: 'Dairy', handle: 'dairy' },
-    { id: 'cat_4', name: 'Grains', handle: 'grains' },
-    { id: 'cat_5', name: 'Groceries', handle: 'groceries' }
-  ];
-
-  const getMockProducts = (): Product[] => [
-    { id: 'p_1', title: 'Fresh Banana (Hand)', description: 'Sweet and organic bananas harvested daily.', thumbnail: 'https://images.unsplash.com/photo-1571771894821-ad99026a0947?auto=format&fit=crop&q=80&w=400', variants: [{ id: 'v_1', title: '1kg', prices: [{ amount: 800, currency_code: 'RWF' }], inventory_quantity: 50 }], categories: [{ id: 'cat_1', name: 'Fruits' }] },
-    { id: 'p_2', title: 'Irish Potatoes', description: 'Perfect for boiling or frying.', thumbnail: 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?auto=format&fit=crop&q=80&w=400', variants: [{ id: 'v_2', title: '5kg', prices: [{ amount: 4500, currency_code: 'RWF' }], inventory_quantity: 20 }], categories: [{ id: 'cat_2', name: 'Vegetables' }] },
-    { id: 'p_3', title: 'Inyange Whole Milk', description: 'Fresh pasteurized whole milk.', thumbnail: 'https://images.unsplash.com/photo-1550583724-1255818c093b?auto=format&fit=crop&q=80&w=400', variants: [{ id: 'v_3', title: '1L', prices: [{ amount: 1200, currency_code: 'RWF' }], inventory_quantity: 100 }], categories: [{ id: 'cat_3', name: 'Dairy' }] },
-    { id: 'p_4', title: 'Organic Avocados', description: 'Large, creamy avocados.', thumbnail: 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?auto=format&fit=crop&q=80&w=400', variants: [{ id: 'v_4', title: 'Piece', prices: [{ amount: 500, currency_code: 'RWF' }], inventory_quantity: 30 }], categories: [{ id: 'cat_1', name: 'Fruits' }] }
-  ];
 
   useEffect(() => {
     const init = async () => {
       try {
         const [r, c] = await Promise.all([consumerApi.getRetailers(), consumerApi.getCategories()]);
-        setRetailers(r.data.retailers || getMockRetailers());
-        setCategories(c.data.categories || getMockCategories());
-      } catch {
-        setRetailers(getMockRetailers());
-        setCategories(getMockCategories());
+        setRetailers(r.data.retailers || []);
+        setCategories(c.data.categories || []);
+      } catch (error) {
+        console.error("Error fetching shop data:", error);
+        message.error("Failed to load retailers and categories");
+        setRetailers([]);
+        setCategories([]);
       } finally { setLoading(false); }
     };
     init();
@@ -152,8 +135,12 @@ export const ShopPage: React.FC = () => {
     setLoadingProducts(true);
     try {
       const res = await consumerApi.getProducts({ retailerId: selectedRetailer.id });
-      setProducts(res.data.products || getMockProducts());
-    } catch { setProducts(getMockProducts()); }
+      setProducts(res.data.products || []);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      message.error("Failed to load products");
+      setProducts([]);
+    }
     finally { setLoadingProducts(false); }
   }, [selectedRetailer]);
 
@@ -206,15 +193,37 @@ export const ShopPage: React.FC = () => {
   };
 
   const handlePaymentSubmit = async () => {
+    if (!selectedRetailer) return;
     setProcessingPayment(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setPaymentSuccess(true);
-    setTimeout(() => {
-      clearCart();
-      setShowCheckoutModal(false);
-      setPaymentSuccess(false);
-    }, 2000);
-    setProcessingPayment(false);
+    try {
+      const payload = {
+        retailerId: selectedRetailer.id,
+        items: cartItems.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        paymentMethod: paymentMethod, // 'wallet' or otherwise
+        total: cartTotal
+      };
+
+      const response = await consumerApi.createOrder(payload);
+
+      if (response.data.success) {
+        setPaymentSuccess(true);
+        message.success("Order placed successfully!");
+        setTimeout(() => {
+          clearCart();
+          setShowCheckoutModal(false);
+          setPaymentSuccess(false);
+        }, 2000);
+      }
+    } catch (error: any) {
+      console.error("Payment failed:", error);
+      message.error(error.response?.data?.error || "Payment failed. Please try again.");
+    } finally {
+      setProcessingPayment(false);
+    }
   };
 
   return (

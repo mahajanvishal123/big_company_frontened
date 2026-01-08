@@ -26,6 +26,7 @@ import {
   WalletOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { consumerApi } from '../../services/apiService';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -103,84 +104,14 @@ const CreditLedgerPage: React.FC = () => {
   const fetchLoanDetails = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with real API call
-      // const response = await fetch('/api/consumer/loans/ledger');
-      // const data = await response.json();
-
-      // Mock data for active loan
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      const mockLoan: LoanDetails = {
-        id: '1',
-        loan_number: 'LOAN-2024-001',
-        amount: 500000,
-        disbursed_date: '2024-11-15T10:00:00Z',
-        repayment_frequency: 'weekly',
-        interest_rate: 5,
-        total_amount: 525000,
-        outstanding_balance: 300000,
-        paid_amount: 225000,
-        next_payment_date: '2024-12-12T23:59:59Z',
-        next_payment_amount: 75000,
-        status: 'active',
-        payment_schedule: [
-          {
-            id: '1',
-            payment_number: 1,
-            due_date: '2024-11-22T23:59:59Z',
-            amount: 75000,
-            status: 'paid',
-            paid_date: '2024-11-21T14:30:00Z',
-          },
-          {
-            id: '2',
-            payment_number: 2,
-            due_date: '2024-11-29T23:59:59Z',
-            amount: 75000,
-            status: 'paid',
-            paid_date: '2024-11-28T16:45:00Z',
-          },
-          {
-            id: '3',
-            payment_number: 3,
-            due_date: '2024-12-06T23:59:59Z',
-            amount: 75000,
-            status: 'paid',
-            paid_date: '2024-12-05T09:15:00Z',
-          },
-          {
-            id: '4',
-            payment_number: 4,
-            due_date: '2024-12-12T23:59:59Z',
-            amount: 75000,
-            status: 'upcoming',
-          },
-          {
-            id: '5',
-            payment_number: 5,
-            due_date: '2024-12-19T23:59:59Z',
-            amount: 75000,
-            status: 'upcoming',
-          },
-          {
-            id: '6',
-            payment_number: 6,
-            due_date: '2024-12-26T23:59:59Z',
-            amount: 75000,
-            status: 'upcoming',
-          },
-          {
-            id: '7',
-            payment_number: 7,
-            due_date: '2025-01-02T23:59:59Z',
-            amount: 75000,
-            status: 'upcoming',
-          },
-        ],
-      };
-
-      setLoan(mockLoan);
+      const response = await consumerApi.getActiveLoanLedger();
+      if (response.data.loan) {
+        setLoan(response.data.loan);
+      } else {
+        setLoan(null);
+      }
     } catch (error) {
+      console.error("Error fetching loan ledger:", error);
       message.error('Failed to load loan details');
     } finally {
       setLoading(false);
@@ -196,22 +127,27 @@ const CreditLedgerPage: React.FC = () => {
   };
 
   const submitPayment = async (values: any) => {
+    if (!loan) return;
     setLoading(true);
     try {
-      // TODO: Replace with real API call
-      // await fetch('/api/consumer/loans/payment', {
-      //   method: 'POST',
-      //   body: JSON.stringify({ ...values, loan_id: loan?.id, method: paymentMethod }),
-      // });
+      // paymentMethod in form submission is handled by state `paymentMethod`
+      const payload = {
+        amount: Number(values.amount),
+        payment_method: paymentMethod || 'wallet', // Default to wallet if null
+        // Mobile money fields if applicable (backend needs to support them, currently likely mocked or basic)
+        phone: values.phone,
+        provider: values.provider
+      };
 
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await consumerApi.repayLoan(loan.id, payload);
 
-      message.success(`Payment of ${values.amount.toLocaleString()} RWF initiated successfully!`);
+      message.success(`Payment of ${values.amount.toLocaleString()} RWF processed successfully!`);
       setPaymentModalVisible(false);
       form.resetFields();
       fetchLoanDetails(); // Refresh loan details
-    } catch (error) {
-      message.error('Payment failed. Please try again.');
+    } catch (error: any) {
+      console.error("Repayment failed:", error);
+      message.error(error.response?.data?.error || 'Payment failed. Please try again.');
     } finally {
       setLoading(false);
     }

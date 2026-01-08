@@ -99,107 +99,61 @@ export const GasPage: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money'>('wallet');
   const [topupResult, setTopupResult] = useState<any>(null);
 
-  // Mock data
-  const mockMeters: GasMeter[] = [
-    {
-      id: '1',
-      meter_number: 'MTR-001234',
-      alias: 'Home Kitchen',
-      owner_name: 'Jean Paul Niyonzima',
-      id_number: '1198780123456789',
-      phone_number: '+250788123456',
-      customer_id: 'current-user',
-      created_at: '2024-01-15T10:00:00Z',
-    },
-    {
-      id: '2',
-      meter_number: 'MTR-005678',
-      alias: 'Restaurant - Main',
-      owner_name: 'Marie Claire Mukandutiye',
-      id_number: '1199680234567890',
-      phone_number: '+250788234567',
-      customer_id: 'current-user',
-      created_at: '2024-06-20T14:00:00Z',
-    },
-  ];
-
-  const mockHistory: GasTopup[] = [
-    {
-      id: '1',
-      meter_number: 'MTR-001234',
-      meter_alias: 'Home Kitchen',
-      amount: 5000,
-      units_purchased: 4166,
-      token: '1234-5678-9012-3456',
-      payment_method: 'Dashboard Balance',
-      created_at: '2024-11-30T10:00:00Z',
-    },
-    {
-      id: '2',
-      meter_number: 'MTR-005678',
-      meter_alias: 'Restaurant - Main',
-      amount: 10000,
-      units_purchased: 8333,
-      token: '9876-5432-1098-7654',
-      payment_method: 'MTN Mobile Money',
-      created_at: '2024-11-28T15:30:00Z',
-    },
-    {
-      id: '3',
-      meter_number: 'MTR-001234',
-      meter_alias: 'Home Kitchen',
-      amount: 3000,
-      units_purchased: 2500,
-      token: '1111-2222-3333-4444',
-      payment_method: 'Airtel Money',
-      created_at: '2024-11-25T09:15:00Z',
-    },
-  ];
-
-  const mockUsageHistory: GasUsage[] = [
-    {
-      id: '1',
-      meter_number: 'MTR-001234',
-      date: '2024-11-30',
-      units_from_topups: 4166,
-      units_from_rewards: 500,
-      total_units: 4666,
-    },
-    {
-      id: '2',
-      meter_number: 'MTR-001234',
-      date: '2024-11-25',
-      units_from_topups: 2500,
-      units_from_rewards: 300,
-      total_units: 2800,
-    },
-    {
-      id: '3',
-      meter_number: 'MTR-005678',
-      date: '2024-11-28',
-      units_from_topups: 8333,
-      units_from_rewards: 1200,
-      total_units: 9533,
-    },
-  ];
-
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
+    setLoading(true);
     try {
-      // Use mock data
-      setMeters(mockMeters);
-      setHistory(mockHistory);
-      setUsageHistory(mockUsageHistory);
-      setBalance(25000); // Dashboard balance
+      const [metersRes, usageRes, walletsRes] = await Promise.all([
+        consumerApi.getGasMeters(),
+        consumerApi.getGasHistory(),
+        consumerApi.getWallet(),
+      ]);
+
+      // Transform meters data
+      if (metersRes.data.success) {
+        const transformedMeters: GasMeter[] = metersRes.data.data.map((m: any) => ({
+          id: m.id,
+          meter_number: m.meter_number,
+          alias: m.alias_name || 'Unnamed Meter',
+          owner_name: m.owner_name || 'N/A',
+          id_number: 'N/A', // Not in backend schema
+          phone_number: m.owner_phone || 'N/A',
+          customer_id: 'current-user',
+          created_at: m.created_at,
+        }));
+        setMeters(transformedMeters);
+      }
+
+      // Transform usage/history data
+      if (usageRes.data.success) {
+        const transformedHistory: GasTopup[] = usageRes.data.data.map((t: any) => ({
+          id: t.id,
+          meter_number: t.meter_number,
+          meter_alias: t.meter_alias || 'Unnamed Meter',
+          amount: t.amount,
+          units_purchased: Math.round(t.units),
+          token: t.token || 'N/A',
+          payment_method: 'Dashboard Balance',
+          created_at: t.created_at,
+        }));
+        setHistory(transformedHistory);
+        setUsageHistory([]); // Usage aggregation not implemented yet
+      }
+
+      // Get wallet balance
+      if (walletsRes.data.success && walletsRes.data.data.length > 0) {
+        const dashboardWallet = walletsRes.data.data.find((w: any) => w.type === 'dashboard_wallet');
+        setBalance(dashboardWallet?.balance || 0);
+      }
     } catch (error) {
       console.error('Failed to fetch gas data:', error);
-      setMeters(mockMeters);
-      setHistory(mockHistory);
-      setUsageHistory(mockUsageHistory);
-      setBalance(25000);
+      message.error('Failed to load gas data');
+      setMeters([]);
+      setHistory([]);
+      setBalance(0);
     } finally {
       setLoading(false);
     }
@@ -253,23 +207,22 @@ export const GasPage: React.FC = () => {
 
     setProcessing(true);
     try {
-      const newMeter: GasMeter = {
-        id: Date.now().toString(),
+      const response = await consumerApi.addGasMeter({
         meter_number: values.meter_number,
-        alias: values.alias,
+        alias_name: values.alias,
         owner_name: meterInfo.owner_name,
-        id_number: meterInfo.id_number,
-        phone_number: meterInfo.phone_number,
-        customer_id: 'current-user',
-        created_at: new Date().toISOString(),
-      };
-      setMeters([...meters, newMeter]);
-      message.success('Meter added successfully!');
-      setShowAddMeter(false);
-      addMeterForm.resetFields();
-      setMeterInfo(null);
+        owner_phone: meterInfo.phone_number,
+      });
+
+      if (response.data.success) {
+        message.success('Meter added successfully!');
+        await fetchData(); // Refresh meters list
+        setShowAddMeter(false);
+        addMeterForm.resetFields();
+        setMeterInfo(null);
+      }
     } catch (error: any) {
-      message.error('Failed to add meter');
+      message.error(error.response?.data?.error || 'Failed to add meter');
     } finally {
       setProcessing(false);
     }
@@ -293,44 +246,28 @@ export const GasPage: React.FC = () => {
 
     setProcessing(true);
     try {
-      // Simulate top-up
-      const units = Math.floor(selectedAmount / 1.2);
-      const token = Math.random().toString().slice(2, 22).match(/.{1,4}/g)?.join('-') || '1234-5678-9012-3456';
-
-      const paymentMethodLabel = paymentMethod === 'wallet'
-        ? 'Dashboard Balance'
-        : values.mobile_provider === 'mtn'
-        ? 'MTN Mobile Money'
-        : 'Airtel Money';
-
-      const mockResult = {
+      const response = await consumerApi.topupGas({
         meter_number: selectedMeter.meter_number,
-        units,
-        token,
         amount: selectedAmount,
-        payment_method: paymentMethodLabel,
-      };
+        payment_method: paymentMethod,
+      });
 
-      setTopupResult(mockResult);
+      if (response.data.success) {
+        const result = response.data.data;
+        setTopupResult({
+          meter_number: result.meter_number,
+          units: Math.round(result.units),
+          token: result.token,
+          amount: result.amount,
+          payment_method: paymentMethod === 'wallet' ? 'Dashboard Balance' : 'Mobile Money',
+        });
 
-      if (paymentMethod === 'wallet') {
-        setBalance(balance - selectedAmount);
+        setBalance(result.new_wallet_balance);
+        await fetchData(); // Refresh history
+        message.success('Gas top-up successful!');
       }
-
-      const newHistory: GasTopup = {
-        id: Date.now().toString(),
-        meter_number: selectedMeter.meter_number,
-        meter_alias: selectedMeter.alias,
-        amount: selectedAmount,
-        units_purchased: units,
-        token,
-        payment_method: paymentMethodLabel,
-        created_at: new Date().toISOString(),
-      };
-      setHistory([newHistory, ...history]);
-      message.success('Gas top-up successful!');
     } catch (error: any) {
-      message.error('Gas top-up failed. Please try again.');
+      message.error(error.response?.data?.error || 'Gas top-up failed. Please try again.');
     } finally {
       setProcessing(false);
     }
@@ -557,11 +494,16 @@ export const GasPage: React.FC = () => {
                     background: 'linear-gradient(135deg, #ff7300 0%, #ff5500 100%)',
                     color: 'white',
                     borderRadius: 12,
+                    minHeight: 280,
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
+                  bodyStyle={{ flex: 1 }}
                   actions={[
                     <Button
                       type="text"
-                      style={{ color: 'white' }}
+                      size="small"
+                      style={{ color: 'white', fontSize: 12 }}
                       onClick={() => {
                         setSelectedMeter(meter);
                         setShowTopup(true);
@@ -571,17 +513,19 @@ export const GasPage: React.FC = () => {
                     </Button>,
                     <Button
                       type="text"
+                      size="small"
                       icon={<HistoryOutlined />}
-                      style={{ color: 'white' }}
+                      style={{ color: 'white', fontSize: 12 }}
                       onClick={() => handleViewUsage(meter)}
                     >
                       Usage
                     </Button>,
                     <Button
                       type="text"
+                      size="small"
                       danger
                       icon={<DeleteOutlined />}
-                      style={{ color: '#ff7875' }}
+                      style={{ color: '#ff7875', fontSize: 12 }}
                       onClick={() => handleDeleteMeter(meter)}
                     >
                       Remove
@@ -593,7 +537,7 @@ export const GasPage: React.FC = () => {
                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>
                         {meter.alias}
                       </Text>
-                      <Title level={4} style={{ color: 'white', margin: '4px 0', letterSpacing: 1 }}>
+                      <Title level={4} style={{ color: 'white', margin: '4px 0', letterSpacing: 1, wordBreak: 'break-word' }}>
                         {meter.meter_number}
                       </Title>
                     </div>

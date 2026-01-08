@@ -18,6 +18,7 @@ import {
   ArrowDownOutlined,
   ShopOutlined,
 } from '@ant-design/icons';
+import { consumerApi } from '../../services/apiService';
 
 const { Title, Text } = Typography;
 
@@ -50,105 +51,10 @@ const CreditTransactionsPage: React.FC = () => {
   const fetchTransactions = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with real API call
-      // const response = await fetch('/api/consumer/loans/transactions');
-      // const data = await response.json();
-
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      // Mock transaction data
-      const mockTransactions: CreditTransaction[] = [
-        {
-          id: '1',
-          type: 'loan_given',
-          amount: 500000,
-          date: '2024-11-15T10:00:00Z',
-          description: 'Food loan disbursement',
-          reference_number: 'LOAN-2024-001',
-          loan_number: 'LOAN-2024-001',
-          status: 'completed',
-        },
-        {
-          id: '2',
-          type: 'card_order',
-          amount: 25000,
-          date: '2024-11-17T14:30:00Z',
-          description: 'Purchase at Kigali Fresh Market',
-          reference_number: 'ORD-2024-789',
-          shop_name: 'Kigali Fresh Market',
-          shop_location: 'Kimironko, Kigali',
-          status: 'completed',
-        },
-        {
-          id: '3',
-          type: 'payment_made',
-          amount: 75000,
-          date: '2024-11-21T14:30:00Z',
-          description: 'Loan payment #1',
-          reference_number: 'PAY-2024-101',
-          loan_number: 'LOAN-2024-001',
-          payment_method: 'Dashboard Balance',
-          status: 'completed',
-        },
-        {
-          id: '4',
-          type: 'card_order',
-          amount: 18500,
-          date: '2024-11-24T09:15:00Z',
-          description: 'Purchase at Downtown Grocery',
-          reference_number: 'ORD-2024-790',
-          shop_name: 'Downtown Grocery',
-          shop_location: 'City Centre, Kigali',
-          status: 'completed',
-        },
-        {
-          id: '5',
-          type: 'payment_made',
-          amount: 75000,
-          date: '2024-11-28T16:45:00Z',
-          description: 'Loan payment #2',
-          reference_number: 'PAY-2024-102',
-          loan_number: 'LOAN-2024-001',
-          payment_method: 'Mobile Money',
-          status: 'completed',
-        },
-        {
-          id: '6',
-          type: 'card_order',
-          amount: 32000,
-          date: '2024-12-01T11:20:00Z',
-          description: 'Purchase at Remera Supermarket',
-          reference_number: 'ORD-2024-791',
-          shop_name: 'Remera Supermarket',
-          shop_location: 'Remera, Kigali',
-          status: 'completed',
-        },
-        {
-          id: '7',
-          type: 'card_order',
-          amount: 45000,
-          date: '2024-12-03T16:00:00Z',
-          description: 'Purchase at Nyabugogo Market',
-          reference_number: 'ORD-2024-792',
-          shop_name: 'Nyabugogo Market',
-          shop_location: 'Nyabugogo, Kigali',
-          status: 'completed',
-        },
-        {
-          id: '8',
-          type: 'payment_made',
-          amount: 75000,
-          date: '2024-12-05T09:15:00Z',
-          description: 'Loan payment #3',
-          reference_number: 'PAY-2024-103',
-          loan_number: 'LOAN-2024-001',
-          payment_method: 'Dashboard Balance',
-          status: 'completed',
-        },
-      ];
-
-      setTransactions(mockTransactions);
+      const response = await consumerApi.getCreditTransactions();
+      setTransactions(response.data.transactions || []);
     } catch (error) {
+      console.error("Error fetching transactions:", error);
       message.error('Failed to load transactions');
     } finally {
       setLoading(false);
