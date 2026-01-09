@@ -24,27 +24,26 @@ import {
   DeleteOutlined,
   MoreOutlined,
   PhoneOutlined,
-  MailOutlined,
-  EnvironmentOutlined
+  MailOutlined
 } from '@ant-design/icons';
-import { supplierService, Supplier } from '../../services/supplierService';
+import { vendorService, Vendor } from '../../services/vendorService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
 
 const VendorManagementPage: React.FC = () => {
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchText, setSearchText] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form] = Form.useForm();
 
-  const fetchSuppliers = async () => {
+  const fetchVendors = async () => {
     try {
       setLoading(true);
-      const data = await supplierService.getSuppliers();
-      setSuppliers(data.suppliers);
+      const data = await vendorService.getVendors();
+      setVendors(data.vendors);
     } catch (error) {
       message.error('Failed to fetch vendors');
       console.error(error);
@@ -54,22 +53,22 @@ const VendorManagementPage: React.FC = () => {
   };
 
   useEffect(() => {
-    fetchSuppliers();
+    fetchVendors();
   }, []);
 
   const handleSave = async (values: any) => {
     try {
       if (editingId) {
-        await supplierService.updateSupplier(editingId, values);
+        await vendorService.updateVendor(editingId, values);
         message.success('Vendor updated successfully');
       } else {
-        await supplierService.createSupplier(values);
+        await vendorService.createVendor(values);
         message.success('Vendor created successfully');
       }
       setShowModal(false);
       setEditingId(null);
       form.resetFields();
-      fetchSuppliers();
+      fetchVendors();
     } catch (error: any) {
       message.error(error.response?.data?.error || 'Operation failed');
     }
@@ -83,9 +82,9 @@ const VendorManagementPage: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await supplierService.deleteSupplier(id);
+          await vendorService.deleteVendor(id);
           message.success('Vendor deleted successfully');
-          fetchSuppliers();
+          fetchVendors();
         } catch (error: any) {
           message.error(error.response?.data?.error || 'Failed to delete vendor');
         }
@@ -93,13 +92,13 @@ const VendorManagementPage: React.FC = () => {
     });
   };
 
-  const openEditModal = (record: Supplier) => {
+  const openEditModal = (record: Vendor) => {
     setEditingId(record.id);
     form.setFieldsValue(record);
     setShowModal(true);
   };
 
-  const filteredSuppliers = suppliers.filter(s =>
+  const filteredVendors = vendors.filter(s =>
     s.name.toLowerCase().includes(searchText.toLowerCase()) ||
     (s.contactPerson?.toLowerCase().includes(searchText.toLowerCase())) ||
     (s.email?.toLowerCase().includes(searchText.toLowerCase()))
@@ -110,7 +109,7 @@ const VendorManagementPage: React.FC = () => {
       title: 'Vendor Name',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string, record: Supplier) => (
+      render: (text: string, record: Vendor) => (
         <Space direction="vertical" size={0}>
           <Text strong>{text}</Text>
           {record.contactPerson && <Text type="secondary" style={{ fontSize: 12 }}>Contact: {record.contactPerson}</Text>}
@@ -120,7 +119,7 @@ const VendorManagementPage: React.FC = () => {
     {
       title: 'Contact Info',
       key: 'contact',
-      render: (_: any, record: Supplier) => (
+      render: (_: any, record: Vendor) => (
         <Space direction="vertical" size={2}>
           {record.email && (
             <Space size={4}>
@@ -153,7 +152,7 @@ const VendorManagementPage: React.FC = () => {
     {
       title: 'Products',
       key: 'products',
-      render: (_: any, record: Supplier) => (
+      render: (_: any, record: Vendor) => (
         <Tag color="cyan">{record._count?.products || 0} Products</Tag>
       ),
     },
@@ -170,7 +169,7 @@ const VendorManagementPage: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: Supplier) => (
+      render: (_: any, record: Vendor) => (
         <Dropdown
           menu={{
             items: [
@@ -222,17 +221,17 @@ const VendorManagementPage: React.FC = () => {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={8}>
           <Card>
-            <Statistic title="Total Vendors" value={suppliers.length} prefix={<ShopOutlined />} />
+            <Statistic title="Total Vendors" value={vendors.length} prefix={<ShopOutlined />} />
           </Card>
         </Col>
         <Col span={8}>
           <Card>
-            <Statistic title="Active Vendors" value={suppliers.filter(s => s.status === 'active').length} valueStyle={{ color: '#3f8600' }} />
+            <Statistic title="Active Vendors" value={vendors.filter(s => s.status === 'active').length} valueStyle={{ color: '#3f8600' }} />
           </Card>
         </Col>
         <Col span={8}>
           <Card>
-            <Statistic title="Total Products Sourced" value={suppliers.reduce((acc, curr) => acc + (curr._count?.products || 0), 0)} />
+            <Statistic title="Total Products Sourced" value={vendors.reduce((acc, curr) => acc + (curr._count?.products || 0), 0)} />
           </Card>
         </Col>
       </Row>
@@ -248,7 +247,7 @@ const VendorManagementPage: React.FC = () => {
         </div>
         <Table
           columns={columns}
-          dataSource={filteredSuppliers}
+          dataSource={filteredVendors}
           rowKey="id"
           loading={loading}
           pagination={{ pageSize: 10 }}

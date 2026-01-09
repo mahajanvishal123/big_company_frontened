@@ -173,12 +173,6 @@ function App() {
                 </ProtectedRoute>}>
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="employees" element={<EmployeeManagementPage />} />
-              <Route path="employees/:id" element={<EmployeeDetailsPage />} />
-              <Route path="payroll" element={<PayrollProcessingPage />} />
-              <Route path="recruitment" element={<RecruitmentPage />} />
-              <Route path="vendors" element={<VendorManagementPage />} />
-              <Route path="deals" element={<DealsPage />} />
               <Route path="accounts" element={<AccountManagementPage />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="customers" element={<CustomerManagementPage />} />

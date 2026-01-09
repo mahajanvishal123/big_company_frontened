@@ -364,9 +364,23 @@ const ConsumerWalletPage: React.FC = () => {
     }
   };
 
-  const handleViewCardOrders = (card: NFCCard) => {
+  const handleViewCardOrders = async (card: NFCCard) => {
     setSelectedCard(card);
     setCardOrdersModalVisible(true);
+    
+    // Fetch card orders from backend
+    try {
+      const response = await nfcApi.getCardOrders(card.id);
+      if (response.data.success) {
+        setCardOrders(prev => ({
+          ...prev,
+          [card.id]: response.data.data
+        }));
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch card orders:', error);
+      message.error('Failed to load order history');
+    }
   };
 
   const handleUnlinkCard = async (card: NFCCard) => {

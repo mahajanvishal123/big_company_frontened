@@ -393,6 +393,7 @@ export const nfcApi = {
   setPrimaryCard: (cardId: string) => api.put(`/nfc/cards/${cardId}/primary`),
   updateCardNickname: (cardId: string, nickname: string) =>
     api.put(`/nfc/cards/${cardId}/nickname`, { nickname }),
+  getCardOrders: (cardId: string) => api.get(`/nfc/cards/${cardId}/orders`),
 
   // POS NFC operations (for retailers)
   processNFCPayment: (

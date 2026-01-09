@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
+import { API_URL } from "../../config";
 import {
   Card,
   Row,
@@ -102,7 +103,9 @@ export const MyManagementPage: React.FC = () => {
   const [supplierModalOpen, setSupplierModalOpen] = useState(false);
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [addSupplierModalOpen, setAddSupplierModalOpen] = useState(false);
+  const [editSupplierModalOpen, setEditSupplierModalOpen] = useState(false);
   const [form] = Form.useForm();
+  const [editForm] = Form.useForm();
   const [searchText, setSearchText] = useState("");
 
   useEffect(() => {
@@ -116,7 +119,7 @@ export const MyManagementPage: React.FC = () => {
 
       // Fetch suppliers from real API
       const suppliersResponse = await fetch(
-        "https://big-pos-backend-production.up.railway.app/wholesaler/management/suppliers",
+        `${API_URL}/wholesaler/management/suppliers`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -134,7 +137,7 @@ export const MyManagementPage: React.FC = () => {
 
       // Fetch profit invoices from real API
       const invoicesResponse = await fetch(
-        "https://big-pos-backend-production.up.railway.app/wholesaler/management/profit-invoices",
+        `${API_URL}/wholesaler/management/profit-invoices`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -152,7 +155,7 @@ export const MyManagementPage: React.FC = () => {
 
       // Fetch management stats from real API
       const statsResponse = await fetch(
-        "https://big-pos-backend-production.up.railway.app/wholesaler/management/stats",
+        `${API_URL}/wholesaler/management/stats`,
         {
           headers: {
             Authorization: `Bearer ${authToken}`,
@@ -193,7 +196,7 @@ export const MyManagementPage: React.FC = () => {
       const authToken = token || localStorage.getItem("bigcompany_token");
 
       const response = await fetch(
-        "https://big-pos-backend-production.up.railway.app/wholesaler/management/suppliers",
+        `${API_URL}/wholesaler/management/suppliers`,
         {
           method: "POST",
           headers: {
@@ -217,6 +220,38 @@ export const MyManagementPage: React.FC = () => {
     } catch (error) {
       console.error("Error adding supplier:", error);
       message.error("Failed to add supplier");
+    }
+  };
+
+  const handleEditSupplier = async (values: any) => {
+    if (!selectedSupplier) return;
+    try {
+      const authToken = token || localStorage.getItem("bigcompany_token");
+
+      const response = await fetch(
+        `${API_URL}/wholesaler/management/suppliers/${selectedSupplier.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(values),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to update supplier");
+      }
+
+      message.success("Supplier updated successfully!");
+      setEditSupplierModalOpen(false);
+      editForm.resetFields();
+      setSelectedSupplier(null);
+      fetchManagementData();
+    } catch (error) {
+      console.error("Error updating supplier:", error);
+      message.error("Failed to update supplier");
     }
   };
 
@@ -308,7 +343,15 @@ export const MyManagementPage: React.FC = () => {
           >
             View
           </Button>
-          <Button size="small" icon={<EditOutlined />}>
+          <Button 
+            size="small" 
+            icon={<EditOutlined />}
+            onClick={() => {
+              setSelectedSupplier(record);
+              editForm.setFieldsValue(record);
+              setEditSupplierModalOpen(true);
+            }}
+          >
             Edit
           </Button>
         </Space>
@@ -820,6 +863,104 @@ export const MyManagementPage: React.FC = () => {
               </Button>
               <Button type="primary" htmlType="submit">
                 Add Supplier
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* Edit Supplier Modal */}
+      <Modal
+        title="Edit Supplier/Manufacturer"
+        open={editSupplierModalOpen}
+        onCancel={() => {
+          setEditSupplierModalOpen(false);
+          editForm.resetFields();
+          setSelectedSupplier(null);
+        }}
+        footer={null}
+        width={700}
+      >
+        <Form form={editForm} layout="vertical" onFinish={handleEditSupplier}>
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="name"
+                label="Company Name"
+                rules={[{ required: true }]}
+              >
+                <Input size="large" placeholder="e.g., Bralirwa Ltd" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="type" label="Type" rules={[{ required: true }]}>
+                <Select size="large" placeholder="Select type">
+                  <Option value="supplier">Supplier</Option>
+                  <Option value="manufacturer">Manufacturer</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="contact_person"
+                label="Contact Person"
+                rules={[{ required: true }]}
+              >
+                <Input size="large" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="email"
+                label="Email"
+                rules={[{ required: true, type: "email" }]}
+              >
+                <Input size="large" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="phone"
+                label="Phone"
+                rules={[{ required: true }]}
+              >
+                <Input size="large" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="payment_terms"
+                label="Payment Terms"
+                rules={[{ required: true }]}
+              >
+                <Select size="large">
+                  <Option value="Net 7">Net 7</Option>
+                  <Option value="Net 15">Net 15</Option>
+                  <Option value="Net 30">Net 30</Option>
+                  <Option value="Net 60">Net 60</Option>
+                  <Option value="Cash on Delivery">Cash on Delivery</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={24}>
+              <Form.Item name="address" label="Address">
+                <TextArea rows={2} />
+              </Form.Item>
+            </Col>
+          </Row>
+          <Form.Item>
+            <Space style={{ width: "100%", justifyContent: "flex-end" }}>
+              <Button
+                onClick={() => {
+                  setEditSupplierModalOpen(false);
+                  editForm.resetFields();
+                  setSelectedSupplier(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit">
+                Update Supplier
               </Button>
             </Space>
           </Form.Item>
