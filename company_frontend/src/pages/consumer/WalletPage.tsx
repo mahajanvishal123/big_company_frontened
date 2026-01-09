@@ -1209,7 +1209,7 @@ const ConsumerWalletPage: React.FC = () => {
             label="Phone Number"
             rules={[
               { required: true },
-              { pattern: /^(\+?250)?(78|73|72)\d{7}$/, message: 'Invalid phone number' },
+              { pattern: /^(\+?250|0)?7[2389]\d{7,8}$/, message: 'Invalid phone number' },
             ]}
           >
             <Input prefix={<PhoneOutlined />} placeholder="+250788123456" />
@@ -1273,7 +1273,10 @@ const ConsumerWalletPage: React.FC = () => {
           <Form.Item
             name="phoneNumber"
             label="Phone Number (linked to account)"
-            rules={[{ required: true }]}
+            rules={[
+              { required: true },
+              { pattern: /^(\+?250|0)?7[2389]\d{7,8}$/, message: 'Invalid phone number' }
+            ]}
           >
             <Input prefix={<PhoneOutlined />} placeholder="+250788123456" />
           </Form.Item>

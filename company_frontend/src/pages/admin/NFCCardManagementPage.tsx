@@ -43,7 +43,8 @@ import { adminApi } from '../../services/apiService';
 
 interface NFCCard {
   id: string;
-  card_number: string;
+  card_number?: string;
+  uid: string;
   user_id?: string;
   user_name?: string;
   user_type?: 'retailer' | 'wholesaler';
@@ -94,17 +95,14 @@ const NFCCardManagementPage: React.FC = () => {
     }
 
     try {
-      const token = localStorage.getItem('admin_token');
-      await axios.post(
-        `${API_URL}/admin/nfc-cards`,
-        { card_number: newCardNumber },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const response = await adminApi.registerNFCCard(newCardNumber);
 
-      setSuccess('NFC card created successfully');
-      setCreateDialog(false);
-      setNewCardNumber('');
-      fetchCards();
+      if (response.data.success) {
+        setSuccess('NFC card created successfully');
+        setCreateDialog(false);
+        setNewCardNumber('');
+        fetchCards();
+      }
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
       console.error('Error creating card:', err);
@@ -114,14 +112,15 @@ const NFCCardManagementPage: React.FC = () => {
 
   const handleCardAction = async (cardId: string, action: 'activate' | 'block' | 'unlink') => {
     try {
-      const token = localStorage.getItem('admin_token');
-      await axios.put(
-        `${API_URL}/admin/nfc-cards/${cardId}/${action}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      if (action === 'block') {
+        await adminApi.blockNFCCard(cardId);
+      } else if (action === 'activate') {
+        await adminApi.activateNFCCard(cardId);
+      } else if (action === 'unlink') {
+        await adminApi.unlinkNFCCard(cardId);
+      }
 
-      setSuccess(`Card ${action}d successfully`);
+      setSuccess(`Card ${action}ed successfully`);
       fetchCards();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
@@ -132,7 +131,7 @@ const NFCCardManagementPage: React.FC = () => {
 
   const filteredCards = cards.filter(
     (card) =>
-      card.card_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      card.uid.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (card.user_name && card.user_name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
@@ -215,7 +214,7 @@ const NFCCardManagementPage: React.FC = () => {
         <Table>
           <TableHead>
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell><strong>Card Number</strong></TableCell>
+              <TableCell><strong>Card UID</strong></TableCell>
               <TableCell><strong>Assigned To</strong></TableCell>
               <TableCell><strong>User Type</strong></TableCell>
               <TableCell><strong>Balance</strong></TableCell>
@@ -242,7 +241,7 @@ const NFCCardManagementPage: React.FC = () => {
                 <TableRow key={card.id} hover>
                   <TableCell>
                     <Typography variant="body2" fontFamily="monospace" fontWeight="bold">
-                      {card.card_number}
+                      {card.uid}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -380,8 +379,8 @@ const NFCCardManagementPage: React.FC = () => {
           {detailsDialog && (
             <Stack spacing={2} sx={{ mt: 2 }}>
               <TextField
-                label="Card Number"
-                value={detailsDialog.card_number}
+                label="Card UID"
+                value={detailsDialog.uid}
                 fullWidth
                 InputProps={{ readOnly: true }}
               />

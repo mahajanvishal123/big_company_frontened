@@ -533,10 +533,14 @@ export const adminApi = {
 
   // NFC Cards
   getNFCCards: (params?: any) => api.get("/admin/nfc-cards", { params }),
-  registerNFCCard: (cardUid: string, dashboardId?: string) =>
-    api.post("/admin/nfc-cards/register", { cardUid, dashboardId }),
-  blockNFCCard: (uid: string, blocked: boolean, reason?: string) =>
-    api.post(`/admin/nfc-cards/${uid}/block`, { blocked, reason }),
+  registerNFCCard: (uid: string, pin?: string) =>
+    api.post("/admin/nfc-cards", { uid, pin }),
+  blockNFCCard: (id: string) =>
+    api.put(`/admin/nfc-cards/${id}/block`),
+  activateNFCCard: (id: string) =>
+    api.put(`/admin/nfc-cards/${id}/activate`),
+  unlinkNFCCard: (id: string) =>
+    api.put(`/admin/nfc-cards/${id}/unlink`),
 
   // Reports
   getTransactionReport: (params?: {
