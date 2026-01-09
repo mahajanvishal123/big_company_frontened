@@ -98,74 +98,72 @@ export const RewardsPage: React.FC = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      // Try to fetch real data, but use mock data if endpoints don't exist yet
-      const mockBalance: RewardsBalance = {
-        points: 2500,
-        lifetime_points: 8750,
-      };
-
-      const mockTransactions: RewardTransaction[] = [
-        {
-          id: '1',
-          type: 'earned',
-          points: 50,
-          description: 'Shopping rewards',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          meter_id: 'MTR-001234',
-          order_amount: 15000,
-          order_id: 'ORD-2024-001',
-        },
-        {
-          id: '2',
-          type: 'earned',
-          points: 120,
-          description: 'Shopping rewards',
-          created_at: new Date(Date.now() - 86400000).toISOString(),
-          meter_id: 'MTR-001234',
-          order_amount: 35000,
-          order_id: 'ORD-2024-002',
-        },
-        {
-          id: '3',
-          type: 'earned',
-          points: 80,
-          description: 'Shopping rewards',
-          created_at: new Date(Date.now() - 172800000).toISOString(),
-          meter_id: 'MTR-005678',
-          order_amount: 22000,
-          order_id: 'ORD-2024-003',
-        },
-      ];
-
-      const mockLeaderboard: LeaderboardEntry[] = [
-        { rank: 1, name: 'John D.', points: 15200, tier: 'PLATINUM', is_current_user: false },
-        { rank: 2, name: 'Sarah M.', points: 12500, tier: 'GOLD', is_current_user: false },
-        { rank: 3, name: 'You', points: 2500, tier: 'SILVER', is_current_user: true },
-      ];
-
-      const balancePromise = consumerApi.getRewardsBalance().catch(() => ({ data: mockBalance }));
-      const historyPromise = consumerApi.getRewardsHistory(20).catch(() => ({ data: { transactions: mockTransactions } }));
-      const referralPromise = consumerApi.getReferralCode().catch(() => ({ data: { referral_code: 'BIG' + Math.random().toString(36).substr(2, 6).toUpperCase() } }));
-      const leaderboardPromise = consumerApi.getLeaderboard('month').catch(() => ({ data: { leaderboard: mockLeaderboard } }));
-
       const [balanceRes, historyRes, referralRes, leaderboardRes] = await Promise.all([
-        balancePromise,
-        historyPromise,
-        referralPromise,
-        leaderboardPromise,
+        consumerApi.getRewardsBalance(),
+        consumerApi.getRewardsHistory(20),
+        consumerApi.getReferralCode(),
+        consumerApi.getLeaderboard('month'),
       ]);
 
-      setBalance(balanceRes.data);
-      setTransactions(historyRes.data.transactions || mockTransactions);
-      setReferralCode(referralRes.data.referral_code || 'BIG' + Math.random().toString(36).substr(2, 6).toUpperCase());
-      setLeaderboard(leaderboardRes.data.leaderboard || mockLeaderboard);
+      // Transform balance: backend returns units (m³), frontend uses points (100 points = 1 m³)
+      if (balanceRes.data.success) {
+        const totalUnits = balanceRes.data.data.total_units || 0;
+        setBalance({
+          points: Math.round(totalUnits * 100), // Convert m³ to points
+          lifetime_points: Math.round(totalUnits * 100), // For now, same as current
+        });
+      }
+
+      // Transform history: map units to points and add metadata
+      if (historyRes.data.success) {
+        const transformedTransactions: RewardTransaction[] = historyRes.data.data.map((item: any) => {
+          const points = Math.round(Math.abs(item.units) * 100);
+          const isPositive = item.units > 0;
+
+          return {
+            id: item.id,
+            type: item.source === 'redemption' ? 'redeemed' :
+              item.source === 'referral' ? 'referral' :
+                item.source === 'bonus' ? 'bonus' : 'earned',
+            points: points,
+            description: item.source === 'purchase' ? 'Shopping rewards' :
+              item.source === 'redemption' ? item.reference :
+                item.reference || 'Gas reward',
+            created_at: item.created_at,
+            meter_id: item.metadata?.meter_id,
+            order_amount: item.metadata?.order_amount,
+            order_id: item.metadata?.order_id || item.reference,
+          };
+        });
+        setTransactions(transformedTransactions);
+      }
+
+      // Referral code
+      if (referralRes.data.success) {
+        setReferralCode(referralRes.data.data.referral_code);
+      }
+
+      // Transform leaderboard: map units to points
+      if (leaderboardRes.data.success) {
+        const userId = localStorage.getItem('bigcompany_user');
+        const currentUserName = userId ? JSON.parse(userId).name : '';
+
+        const transformedLeaderboard: LeaderboardEntry[] = leaderboardRes.data.data.map((item: any, index: number) => ({
+          rank: item.rank || index + 1,
+          name: item.customer_name,
+          points: Math.round(item.total_units * 100), // Convert m³ to points
+          tier: item.total_units > 100 ? 'PLATINUM' :
+            item.total_units > 50 ? 'GOLD' :
+              item.total_units > 20 ? 'SILVER' : 'BRONZE',
+          is_current_user: item.customer_name === currentUserName,
+        }));
+        setLeaderboard(transformedLeaderboard);
+      }
     } catch (error) {
       console.error('Failed to fetch rewards data:', error);
-      // Use mock data as complete fallback
-      setBalance({
-        points: 2500,
-        lifetime_points: 8750,
-      });
+      message.error('Failed to load rewards data');
+      // Set empty states on error
+      setBalance({ points: 0, lifetime_points: 0 });
       setTransactions([]);
       setReferralCode('BIG' + Math.random().toString(36).substr(2, 6).toUpperCase());
       setLeaderboard([]);
@@ -212,35 +210,18 @@ export const RewardsPage: React.FC = () => {
     try {
       const response = await consumerApi.redeemRewards(points);
       if (response.data.success) {
+        const walletCredit = response.data.data.wallet_credit;
         message.success(
-          `Redeemed ${points} points for ${(points * 10).toLocaleString()} RWF wallet credit!`
+          `Redeemed ${points} points for ${walletCredit.toLocaleString()} RWF wallet credit!`
         );
-        setBalance((prev) => (prev ? { ...prev, points: prev.points - points } : null));
         setRedeemAmount('');
-        await fetchData();
+        await fetchData(); // Refresh all data
       } else {
         message.error(response.data.error || 'Failed to redeem points');
       }
     } catch (error: any) {
       console.error('Redemption failed:', error);
-      // If backend endpoint doesn't exist yet, simulate redemption
-      if (error.response?.status === 401 || error.response?.status === 404) {
-        message.success(
-          `Redeemed ${points} points for ${(points * 10).toLocaleString()} RWF wallet credit! (Demo mode - will sync when backend is ready)`
-        );
-        setBalance((prev) => (prev ? { ...prev, points: prev.points - points } : null));
-        setRedeemAmount('');
-        const newTransaction: RewardTransaction = {
-          id: Date.now().toString(),
-          type: 'redeemed',
-          points,
-          description: `Redeemed for ${(points * 10).toLocaleString()} RWF wallet credit`,
-          created_at: new Date().toISOString(),
-        };
-        setTransactions([newTransaction, ...transactions]);
-      } else {
-        message.error(error.response?.data?.error || 'Failed to redeem points');
-      }
+      message.error(error.response?.data?.error || 'Failed to redeem points');
     } finally {
       setRedeeming(false);
     }

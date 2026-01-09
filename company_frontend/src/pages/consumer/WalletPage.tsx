@@ -49,7 +49,7 @@ import {
   EnvironmentOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { nfcApi, walletApi } from '../../services/apiService';
+import { consumerApi, nfcApi, walletApi } from '../../services/apiService';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -140,7 +140,7 @@ const ConsumerWalletPage: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<NFCCard | null>(null);
   const [activeTab, setActiveTab] = useState('transactions');
   const [cardOrdersModalVisible, setCardOrdersModalVisible] = useState(false);
-  const [cardOrders, setCardOrders] = useState<{[key: string]: CardOrder[]}>({});
+  const [cardOrders, setCardOrders] = useState<{ [key: string]: CardOrder[] }>({});
 
   const [topUpForm] = Form.useForm();
   const [refundForm] = Form.useForm();
@@ -148,170 +148,102 @@ const ConsumerWalletPage: React.FC = () => {
   const [linkCardForm] = Form.useForm();
   const [changePinForm] = Form.useForm();
 
-  // Mock data with 3-balance structure
-  const mockBalance: WalletBalance = {
-    dashboardBalance: 25000,
-    creditBalance: 5000,
-    availableBalance: 30000, // 25000 + 5000
-    currency: 'RWF',
-  };
 
-  const mockCards: NFCCard[] = [
-    {
-      id: '1',
-      uid: '04:A1:B2:C3:D4:E5:F6',
-      card_number: 'NFC-001-2024',
-      status: 'active',
-      is_primary: true,
-      linked_at: '2024-01-15T10:30:00Z',
-      last_used: '2024-11-30T09:15:00Z',
-      nickname: 'My Main Card',
-    },
-    {
-      id: '2',
-      uid: '04:F1:E2:D3:C4:B5:A6',
-      card_number: 'NFC-002-2024',
-      status: 'active',
-      is_primary: false,
-      linked_at: '2024-06-20T14:45:00Z',
-      last_used: '2024-11-25T16:30:00Z',
-      nickname: 'Backup Card',
-    },
-  ];
-
-  const mockCardOrders: {[key: string]: CardOrder[]} = {
-    '1': [ // Orders for card 1
-      {
-        id: '1',
-        order_number: 'ORD-2024-789',
-        shop_name: 'Kigali Fresh Market',
-        shop_location: 'Kimironko, Kigali',
-        amount: 25000,
-        items_count: 8,
-        date: '2024-12-05T14:30:00Z',
-        status: 'completed'
-      },
-      {
-        id: '2',
-        order_number: 'ORD-2024-756',
-        shop_name: 'City Pharmacy',
-        shop_location: 'City Center, Kigali',
-        amount: 15000,
-        items_count: 5,
-        date: '2024-12-03T11:20:00Z',
-        status: 'completed'
-      },
-      {
-        id: '3',
-        order_number: 'ORD-2024-698',
-        shop_name: 'Nyamirambo Superstore',
-        shop_location: 'Nyamirambo, Kigali',
-        amount: 42500,
-        items_count: 12,
-        date: '2024-11-28T09:45:00Z',
-        status: 'completed'
-      },
-      {
-        id: '4',
-        order_number: 'ORD-2024-623',
-        shop_name: 'Kigali Fresh Market',
-        shop_location: 'Kimironko, Kigali',
-        amount: 18000,
-        items_count: 6,
-        date: '2024-11-22T16:15:00Z',
-        status: 'completed'
-      }
-    ],
-    '2': [ // Orders for card 2
-      {
-        id: '5',
-        order_number: 'ORD-2024-812',
-        shop_name: 'Heaven Restaurant',
-        shop_location: 'Remera, Kigali',
-        amount: 35000,
-        items_count: 1,
-        date: '2024-12-01T13:00:00Z',
-        status: 'completed'
-      },
-      {
-        id: '6',
-        order_number: 'ORD-2024-745',
-        shop_name: 'MTN Service Center',
-        shop_location: 'City Center, Kigali',
-        amount: 50000,
-        items_count: 1,
-        date: '2024-11-25T10:30:00Z',
-        status: 'completed'
-      }
-    ]
-  };
-
-  const mockTransactions: Transaction[] = [
-    { id: '1', type: 'order_payment', balance_type: 'dashboard', amount: -2500, description: 'Purchase at Kigali Shop', status: 'completed', created_at: '2024-11-30T09:15:00Z', merchant_name: 'Kigali Shop', order_id: 'ORD-2024-001', meter_id: 'MTR-001234' },
-    { id: '2', type: 'top_up', balance_type: 'dashboard', amount: 10000, description: 'MTN MoMo Top-up', status: 'completed', created_at: '2024-11-29T14:30:00Z', reference_number: 'MTN-20241129-01' },
-    { id: '3', type: 'order_payment', balance_type: 'credit', amount: -1500, description: 'Purchase at Downtown Store (Credit)', status: 'completed', created_at: '2024-11-28T11:00:00Z', merchant_name: 'Downtown Store', order_id: 'ORD-2024-002' },
-    { id: '4', type: 'gas_payment', balance_type: 'dashboard', amount: -3000, description: 'Gas Top-up', status: 'completed', created_at: '2024-11-27T16:45:00Z', meter_id: 'MTR-001234', reference_number: 'GAS-20241127-01' },
-    { id: '5', type: 'refund', balance_type: 'dashboard', amount: 500, description: 'Refund from Kigali Shop', status: 'completed', created_at: '2024-11-26T10:20:00Z', reference_number: 'REF-20241126-01' },
-    { id: '6', type: 'loan_disbursement', balance_type: 'credit', amount: 5000, description: 'Credit Loan Approved', status: 'completed', created_at: '2024-11-25T09:00:00Z', reference_number: 'LOAN-20241125-01' },
-    { id: '7', type: 'top_up', balance_type: 'dashboard', amount: 15000, description: 'Airtel Money Top-up', status: 'completed', created_at: '2024-11-24T08:00:00Z', reference_number: 'ATL-20241124-01' },
-    { id: '8', type: 'order_payment', balance_type: 'dashboard', amount: -4200, description: 'Purchase at Kimironko Fresh', status: 'completed', created_at: '2024-11-23T13:30:00Z', merchant_name: 'Kimironko Fresh', order_id: 'ORD-2024-003', meter_id: 'MTR-001234' },
-  ];
-
-  const mockCreditInfo: CreditInfo = {
-    credit_limit: 10000,
-    available_credit: 5000,
-    used_credit: 5000,
-    outstanding_balance: 5000,
-    payment_status: 'current',
-    next_payment_date: '2024-12-15',
-    next_payment_amount: 1500,
-  };
-
-  const mockCreditOrders: CreditOrder[] = [
-    { id: '1', order_number: 'ORD-2024-002', amount: 1500, date: '2024-11-28', status: 'delivered' },
-    { id: '2', order_number: 'ORD-2024-006', amount: 2000, date: '2024-11-20', status: 'delivered' },
-    { id: '3', order_number: 'ORD-2024-010', amount: 1500, date: '2024-11-15', status: 'delivered' },
-  ];
-
-  const mockCreditApprovals: CreditApproval[] = [
-    {
-      id: '1',
-      amount_requested: 10000,
-      status: 'approved',
-      submitted_at: '2024-11-20T10:00:00Z',
-      reviewed_at: '2024-11-21T14:30:00Z',
-      reason: 'Approved based on transaction history and credit score',
-    },
-    {
-      id: '2',
-      amount_requested: 5000,
-      status: 'approved',
-      submitted_at: '2024-10-15T09:00:00Z',
-      reviewed_at: '2024-10-16T11:00:00Z',
-      reason: 'Initial credit approval',
-    },
-  ];
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      // Use mock data for now
-      setBalance(mockBalance);
-      setCards(mockCards);
-      setTransactions(mockTransactions);
-      setCreditInfo(mockCreditInfo);
-      setCreditOrders(mockCreditOrders);
-      setCreditApprovals(mockCreditApprovals);
-      setCardOrders(mockCardOrders);
+      // Fetch real data from backend
+      const [walletsRes, transactionsRes, cardsRes, loansRes, loanProductsRes] = await Promise.all([
+        consumerApi.getWallets(),
+        consumerApi.getWalletTransactions({ limit: 50 }),
+        nfcApi.getMyCards(),
+        consumerApi.getLoans(), // Fetch active loans
+        consumerApi.getLoanProducts(),
+      ]);
+
+      // Transform wallet data to 3-balance structure
+      if (walletsRes.data.success) {
+        const wallets = walletsRes.data.data;
+        const dashboardWallet = wallets.find((w: any) => w.type === 'dashboard_wallet');
+        const creditWallet = wallets.find((w: any) => w.type === 'credit_wallet');
+
+        const dashboardBalance = dashboardWallet?.balance || 0;
+        const creditBalance = creditWallet?.balance || 0;
+
+        setBalance({
+          dashboardBalance,
+          creditBalance,
+          availableBalance: dashboardBalance + creditBalance,
+          currency: 'RWF',
+        });
+      }
+
+      // Transform transaction data
+      if (transactionsRes.data.success) {
+        const transformedTransactions: Transaction[] = transactionsRes.data.data.map((t: any) => ({
+          id: t.id,
+          type: t.type as any,
+          amount: t.amount,
+          balance_type: t.wallet_type === 'dashboard_wallet' ? 'dashboard' : 'credit',
+          description: t.description,
+          status: t.status,
+          created_at: t.created_at,
+          reference_number: t.reference,
+        }));
+        setTransactions(transformedTransactions);
+      }
+
+      if (cardsRes.data.success) {
+        setCards(cardsRes.data.data);
+      }
+
+      // Process Loan Data
+      // For this phase, we map loans to "Credit Approvals" or "Credit Orders" as per UI needs
+      // Since UI has "Credit Info" block, we can derive it from Loans + Wallets
+      if (loansRes.data.loans) {
+        // Transform active loans to credit approvals list for now
+        const activeLoans = loansRes.data.loans;
+        setCreditApprovals(activeLoans.map((l: any) => ({
+          id: l.id,
+          amount_requested: l.amount,
+          status: l.status,
+          submitted_at: l.createdAt,
+          reason: 'Loan Request'
+        })));
+
+        // Calculate used credit based on active loans
+        const usedCredit = activeLoans.reduce((sum: number, l: any) => sum + l.amount, 0);
+
+        // Assuming max credit is fixed or from profile (using mock limit for now or 50000)
+        const creditLimit = 50000;
+
+        setCreditInfo({
+          credit_limit: creditLimit,
+          available_credit: creditLimit - usedCredit,
+          used_credit: usedCredit,
+          outstanding_balance: usedCredit,
+          payment_status: 'current', // Logic needed
+          next_payment_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // Mock next payment
+        });
+      }
+
+      // setCreditInfo(mockCreditInfo); // Replaced with logic above
+      // setCreditOrders(mockCreditOrders); // Keeping mock orders for now as they are product orders on credit
+      // setCreditApprovals(mockCreditApprovals); // Replaced
+      setCardOrders({});
     } catch (error) {
       console.error('Failed to load wallet data:', error);
-      setBalance(mockBalance);
-      setCards(mockCards);
-      setTransactions(mockTransactions);
-      setCreditInfo(mockCreditInfo);
-      setCreditOrders(mockCreditOrders);
-      setCreditApprovals(mockCreditApprovals);
-      setCardOrders(mockCardOrders);
+      message.error('Failed to load wallet data');
+      // Fallback to mock data on error
+      // Fallback on error (empty states)
+      setBalance(null);
+      setCards([]);
+      setTransactions([]);
+      setCreditInfo(null);
+      setCreditOrders([]);
+      setCreditApprovals([]);
+      setCardOrders({});
     } finally {
       setLoading(false);
     }
@@ -324,12 +256,19 @@ const ConsumerWalletPage: React.FC = () => {
   const handleTopUp = async (values: any) => {
     try {
       setLoading(true);
-      message.success(`Top-up request of ${values.amount.toLocaleString()} RWF submitted!`);
-      setTopUpModalVisible(false);
-      topUpForm.resetFields();
-      loadData();
+      const response = await consumerApi.topupWallet({
+        amount: values.amount,
+        payment_method: values.payment_method || 'mobile_money',
+      });
+
+      if (response.data.success) {
+        message.success(`Top-up of ${values.amount.toLocaleString()} RWF successful!`);
+        setTopUpModalVisible(false);
+        topUpForm.resetFields();
+        await loadData(); // Refresh wallet data
+      }
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Top-up failed');
+      message.error(error.response?.data?.error || 'Top-up failed');
     } finally {
       setLoading(false);
     }
@@ -338,11 +277,15 @@ const ConsumerWalletPage: React.FC = () => {
   const handleRefundRequest = async (values: any) => {
     try {
       setLoading(true);
-      message.success('Refund request submitted successfully! We will review and process it.');
-      setRefundModalVisible(false);
-      refundForm.resetFields();
+      const response = await consumerApi.requestRefund(values);
+
+      if (response.data.success) {
+        message.success('Refund request submitted successfully! We will review and process it.');
+        setRefundModalVisible(false);
+        refundForm.resetFields();
+      }
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Failed to submit refund request');
+      message.error(error.response?.data?.error || 'Failed to submit refund request');
     } finally {
       setLoading(false);
     }
@@ -351,9 +294,22 @@ const ConsumerWalletPage: React.FC = () => {
   const handleLoanRequest = async (values: any) => {
     try {
       setLoading(true);
-      message.success('Loan request submitted successfully! We will review your application.');
-      setLoanModalVisible(false);
-      loanForm.resetFields();
+      const loanProduct = await consumerApi.getLoanProducts(); // Get first product for simplicity or passed from form
+      // Simplification: We assume 'cash' loan type for this generic button or first product
+      let product = loanProduct.data.products?.find((p: any) => p.loan_type === 'cash');
+
+      const response = await consumerApi.applyForLoan({
+        loan_product_id: product?.id || 'lp_2', // Default to personal cash loan
+        amount: values.amount,
+        purpose: values.purpose
+      });
+
+      if (response.data.success) {
+        message.success('Loan application submitted successfully!');
+        setLoanModalVisible(false);
+        loanForm.resetFields();
+        loadData();
+      }
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to submit loan request');
     } finally {
@@ -368,10 +324,13 @@ const ConsumerWalletPage: React.FC = () => {
     }
     try {
       setLoading(true);
-      message.success('NFC card linked successfully!');
-      setLinkCardModalVisible(false);
-      linkCardForm.resetFields();
-      loadData();
+      const response = await nfcApi.linkCard(values.uid, values.pin, values.nickname);
+      if (response.data.success) {
+        message.success('NFC card linked successfully!');
+        setLinkCardModalVisible(false);
+        linkCardForm.resetFields();
+        loadData();
+      }
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to link card');
     } finally {
@@ -383,6 +342,7 @@ const ConsumerWalletPage: React.FC = () => {
     if (!selectedCard) return;
     try {
       setLoading(true);
+      await nfcApi.setCardPin(selectedCard.id, values.old_pin, values.new_pin);
       message.success('Card PIN changed successfully!');
       setChangePinModalVisible(false);
       changePinForm.resetFields();
@@ -396,6 +356,7 @@ const ConsumerWalletPage: React.FC = () => {
 
   const handleSetPrimary = async (card: NFCCard) => {
     try {
+      await nfcApi.setPrimaryCard(card.id);
       message.success(`${card.nickname || card.card_number} set as primary card`);
       loadData();
     } catch (error: any) {
@@ -416,6 +377,7 @@ const ConsumerWalletPage: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
+          await nfcApi.unlinkCard(card.id);
           message.success('Card unlinked successfully');
           loadData();
         } catch (error: any) {
@@ -833,6 +795,7 @@ const ConsumerWalletPage: React.FC = () => {
                             gas_payment: { color: 'orange', label: 'Gas Payment' },
                             top_up: { color: 'green', label: 'Top-up' },
                             refund: { color: 'cyan', label: 'Refund' },
+                            debit: { color: 'red', label: 'Debit' },
                           };
                           const { color, label } = config[type] || { color: 'default', label: type };
                           return <Tag color={color}>{label}</Tag>;
@@ -1042,6 +1005,7 @@ const ConsumerWalletPage: React.FC = () => {
                               order_payment: { color: 'red', label: 'Purchase' },
                               loan_disbursement: { color: 'purple', label: 'Loan' },
                               credit_payment: { color: 'blue', label: 'Payment' },
+                              loan_repayment_replenish: { color: 'green', label: 'Repayment' },
                             };
                             const { color, label } = config[type] || { color: 'default', label: type };
                             return <Tag color={color}>{label}</Tag>;
