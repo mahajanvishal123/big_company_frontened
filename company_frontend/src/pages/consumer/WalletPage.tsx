@@ -575,6 +575,7 @@ const ConsumerWalletPage: React.FC = () => {
                 </Button>
                 <Button
                   icon={<FileTextOutlined />}
+                  onClick={() => setActiveTab('credit_ledger')}
                   block
                   size="small"
                 >

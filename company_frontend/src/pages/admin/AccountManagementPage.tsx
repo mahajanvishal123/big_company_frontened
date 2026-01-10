@@ -101,7 +101,7 @@ const AccountManagementPage: React.FC = () => {
           credit_limit: r.creditLimit,
           status: r.user?.isActive ? 'active' : 'inactive',
           verified: r.isVerified,
-          created_at: r.createdAt
+          created_at: r.user?.createdAt || r.createdAt
         }));
         setRetailers(mappedRetailers);
       }
@@ -115,7 +115,7 @@ const AccountManagementPage: React.FC = () => {
           address: w.address,
           status: w.user?.isActive ? 'active' : 'inactive',
           verified: w.isVerified,
-          created_at: w.createdAt
+          created_at: w.user?.createdAt || w.createdAt
         }));
         setWholesalers(mappedWholesalers);
       }
