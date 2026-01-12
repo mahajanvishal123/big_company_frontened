@@ -27,6 +27,7 @@ import {
   TrophyOutlined,
   UserAddOutlined,
   RocketOutlined,
+  SettingOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types/auth';
@@ -69,12 +70,14 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
   admin: [
     { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/admin/dashboard', mobileLabel: 'Home' },
     { key: 'accounts', icon: <TeamOutlined />, label: 'Account Management', path: '/admin/accounts', mobileLabel: 'Accounts' },
+    { key: 'products', icon: <InboxOutlined />, label: 'Product Listing', path: '/admin/products', mobileLabel: 'Products' },
     { key: 'categories', icon: <ApartmentOutlined />, label: 'Categories', path: '/admin/categories', mobileLabel: 'Categories' },
     { key: 'customers', icon: <UserOutlined />, label: 'Customers', path: '/admin/customers', mobileLabel: 'Users' },
     { key: 'retailers', icon: <ShopOutlined />, label: 'Retailers', path: '/admin/retailers', mobileLabel: 'Retailers' },
     { key: 'wholesalers', icon: <TeamOutlined />, label: 'Wholesalers', path: '/admin/wholesalers', mobileLabel: 'Wholesalers' },
     { key: 'loans', icon: <DollarOutlined />, label: 'Loans', path: '/admin/loans', mobileLabel: 'Loans' },
     { key: 'nfc-cards', icon: <CreditCardOutlined />, label: 'NFC Cards', path: '/admin/nfc-cards', mobileLabel: 'Cards' },
+    { key: 'pricing-config', icon: <SettingOutlined />, label: 'Pricing Config', path: '/admin/pricing-config', mobileLabel: 'Pricing' },
     { key: 'reports', icon: <BarChartOutlined />, label: 'Reports', path: '/admin/reports', mobileLabel: 'Reports' },
     { key: 'profile', icon: <UserOutlined />, label: 'Profile', path: '/admin/profile', mobileLabel: 'Profile' },
   ],

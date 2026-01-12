@@ -1,112 +1,120 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
-  Button,
   Card,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  IconButton,
   Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  TextField,
+  Button,
+  Space,
+  Tag,
+  Modal,
+  Form,
+  Input,
+  message,
   Typography,
-  Chip,
-  Alert,
-  CircularProgress,
-  Paper,
-  InputAdornment,
-  Stack,
-  Tooltip,
+  Row,
+  Col,
   Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
-} from '@mui/material';
+  Alert,
+  InputNumber,
+  Tooltip,
+} from 'antd';
 import {
-  Add as AddIcon,
-  Block as BlockIcon,
-  CheckCircle as ActivateIcon,
-  Search as SearchIcon,
-  CreditCard as CardIcon,
-  Person as PersonIcon,
-  Visibility as VisibilityIcon,
-  Link as LinkIcon,
-  LinkOff as UnlinkIcon,
-} from '@mui/icons-material';
+  PlusOutlined,
+  SearchOutlined,
+  ReloadOutlined,
+  CreditCardOutlined,
+  CheckCircleOutlined,
+  LinkOutlined,
+  StopOutlined,
+  DollarCircleOutlined,
+  UserOutlined,
+  BlockOutlined,
+  UnlockOutlined,
+  HistoryOutlined,
+  EnvironmentOutlined,
+  IdcardOutlined,
+  PhoneOutlined,
+  MailOutlined,
+  FileTextOutlined,
+  EyeOutlined,
+} from '@ant-design/icons';
+import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
+
+const { Title, Text } = Typography;
+const { Option } = Select;
+const { TextArea } = Input;
 
 interface NFCCard {
   id: string;
-  card_number?: string;
   uid: string;
-  user_id?: string;
-  user_name?: string;
-  user_type?: 'retailer' | 'wholesaler';
-  status: 'active' | 'inactive' | 'blocked' | 'unassigned';
+  cardType?: string;
+  cardholderName?: string;
+  nationalId?: string;
+  phone?: string;
+  email?: string;
+  province?: string;
+  district?: string;
+  sector?: string;
+  cell?: string;
+  streetAddress?: string;
+  landmark?: string;
+  status: 'active' | 'inactive' | 'blocked' | 'available' | 'unassigned';
   balance: number;
   last_used?: string;
   created_at: string;
-  assigned_at?: string;
+  user_name?: string;
+  user_id?: string;
 }
 
 const NFCCardManagementPage: React.FC = () => {
-  const [cards, setCards] = useState<NFCCard[]>([]);
   const [loading, setLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState<string>('');
-  const [success, setSuccess] = useState<string>('');
-  const [detailsDialog, setDetailsDialog] = useState<NFCCard | null>(null);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [createDialog, setCreateDialog] = useState(false);
-  const [newCardNumber, setNewCardNumber] = useState('');
+  const [cards, setCards] = useState<NFCCard[]>([]);
+  const [createModalVisible, setCreateModalVisible] = useState(false);
+  const [detailsModalVisible, setDetailsModalVisible] = useState(false);
+  const [selectedCard, setSelectedCard] = useState<NFCCard | null>(null);
+  const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+
+  const [form] = Form.useForm();
 
   useEffect(() => {
     fetchCards();
-  }, [statusFilter]);
+  }, []);
 
   const fetchCards = async () => {
     setLoading(true);
     try {
-      const response = await adminApi.getNFCCards({
-        status: statusFilter === 'all' ? undefined : statusFilter,
-      });
-
+      const response = await adminApi.getNFCCards();
       if (response.data.success) {
         setCards(response.data.cards || []);
       }
     } catch (err: any) {
       console.error('Error fetching NFC cards:', err);
-      setError('Failed to load NFC cards. Using mock data.');
+      message.error('Failed to load NFC cards');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleCreateCard = async () => {
-    if (!newCardNumber.trim()) {
-      setError('Card number is required');
-      return;
-    }
-
+  const handleRegisterCard = async (values: any) => {
+    setLoading(true);
     try {
-      const response = await adminApi.registerNFCCard(newCardNumber);
-
+      const data = {
+        ...values,
+        pin: values.pin?.toString() || '1234'
+      };
+      
+      const response = await adminApi.registerNFCCard(data);
       if (response.data.success) {
-        setSuccess('NFC card created successfully');
-        setCreateDialog(false);
-        setNewCardNumber('');
+        message.success('NFC card registered successfully');
+        setCreateModalVisible(false);
+        form.resetFields();
         fetchCards();
       }
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      console.error('Error creating card:', err);
-      setError(err.response?.data?.error || 'Failed to create card');
+      message.error(err.response?.data?.error || 'Failed to register card');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -119,327 +127,393 @@ const NFCCardManagementPage: React.FC = () => {
       } else if (action === 'unlink') {
         await adminApi.unlinkNFCCard(cardId);
       }
-
-      setSuccess(`Card ${action}ed successfully`);
+      message.success(`Card ${action}ed successfully`);
       fetchCards();
-      setTimeout(() => setSuccess(''), 3000);
     } catch (err: any) {
-      console.error(`Error ${action}ing card:`, err);
-      setError(err.response?.data?.error || `Failed to ${action} card`);
+      message.error(`Failed to ${action} card`);
     }
   };
 
-  const filteredCards = cards.filter(
-    (card) =>
-      card.uid.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (card.user_name && card.user_name.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const columns: ColumnsType<NFCCard> = [
+    {
+      title: 'Card Number',
+      dataIndex: 'uid',
+      key: 'uid',
+      render: (text) => <span className="font-medium text-gray-700">{text}</span>,
+    },
+    {
+      title: 'Assigned To',
+      key: 'assigned_to',
+      render: (_, record) => (
+        <span className={record.cardholderName || record.user_name ? "text-gray-800" : "text-gray-400 italic"}>
+          {record.cardholderName || record.user_name || 'Unassigned'}
+        </span>
+      ),
+    },
+    {
+      title: 'Balance',
+      dataIndex: 'balance',
+      key: 'balance',
+      render: (val) => <span className="text-gray-800">{val?.toLocaleString() || 0} RWF</span>,
+    },
+    {
+      title: 'Transactions',
+      key: 'transactions',
+      render: () => <span className="text-gray-800">0</span>,
+    },
+    {
+      title: 'Last Used',
+      dataIndex: 'last_used',
+      key: 'last_used',
+      render: (val) => <span className="text-gray-600">{val ? new Date(val).toLocaleDateString() : '-'}</span>,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (
+        <Tag className="rounded-full px-3" color={
+          status === 'active' || status === 'available' ? 'green' :
+            status === 'blocked' ? 'red' : 'orange'
+        }>
+          {status?.toUpperCase() || 'UNKNOWN'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Tooltip title="View Details">
+            <Button type="text" size="small" icon={<EyeOutlined />} onClick={() => {
+              setSelectedCard(record);
+              setDetailsModalVisible(true);
+            }} />
+          </Tooltip>
+          {record.status === 'blocked' ? (
+            <Tooltip title="Activate">
+              <Button type="text" size="small" className="text-green-500" icon={<UnlockOutlined />} onClick={() => handleCardAction(record.id, 'activate')} />
+            </Tooltip>
+          ) : (
+            <Tooltip title="Block">
+              <Button type="text" size="small" danger icon={<BlockOutlined />} onClick={() => handleCardAction(record.id, 'block')} />
+            </Tooltip>
+          )}
+        </Space>
+      ),
+    },
+  ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active':
-        return 'success';
-      case 'inactive':
-        return 'default';
-      case 'blocked':
-        return 'error';
-      case 'unassigned':
-        return 'warning';
-      default:
-        return 'default';
-    }
-  };
+  const filteredCards = cards.filter(card => {
+    const matchesSearch = card.uid.toLowerCase().includes(searchText.toLowerCase()) ||
+      (card.cardholderName && card.cardholderName.toLowerCase().includes(searchText.toLowerCase())) ||
+      (card.user_name && card.user_name.toLowerCase().includes(searchText.toLowerCase()));
+    
+    const matchesStatus = statusFilter === 'all' || card.status === statusFilter;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const stats = [
+    { title: 'Total Cards', value: cards.length, icon: <CreditCardOutlined />, border: '#1890ff' },
+    { title: 'Active', value: cards.filter(c => c.status === 'active' || c.status === 'available').length, icon: <CheckCircleOutlined className="text-green-500" />, border: '#52c41a' },
+    { title: 'Unassigned', value: cards.filter(c => !c.user_id && !c.cardholderName).length, icon: <LinkOutlined className="text-orange-500" />, border: '#faad14' },
+    { title: 'Blocked', value: cards.filter(c => c.status === 'blocked').length, icon: <StopOutlined className="text-red-500" />, border: '#ff4d4f' },
+    { title: 'Total Balance (All Cards)', value: `${cards.reduce((acc, c) => acc + (c.balance || 0), 0).toLocaleString()} RWF`, icon: <DollarCircleOutlined className="text-purple-500" />, border: '#722ed1' },
+  ];
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" component="h1">
-          <CardIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
-          NFC Card Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setCreateDialog(true)}
-        >
-          Register New Card
-        </Button>
-      </Stack>
+    <div className="bg-gray-100 min-h-screen p-6">
+      <div className="max-w-[1600px] mx-auto">
+        {/* Teal Header Banner */}
+        <div className="bg-[#00b5ad] p-6 rounded-xl shadow-sm mb-8 text-white flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="bg-white/20 p-3 rounded-lg text-2xl">
+                <CreditCardOutlined />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold m-0 text-white">NFC Card Management</h1>
+                <p className="text-white/80 m-0 text-sm">Manage NFC cards, assignments, and transactions</p>
+              </div>
+            </div>
+            <Space size="middle">
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={fetchCards}
+                className="bg-white border-none text-gray-700 hover:text-[#00b5ad] h-9 px-5 rounded-lg flex items-center font-medium"
+              >
+                Refresh
+              </Button>
+              <Button 
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => setCreateModalVisible(true)}
+                className="bg-[#1890ff] hover:bg-[#40a9ff] border-none h-9 px-5 rounded-lg flex items-center font-medium shadow-sm transition-all"
+              >
+                Register Card
+              </Button>
+            </Space>
+        </div>
 
-      {error && (
-        <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+        {/* Stats Cards Row */}
+        <Row gutter={[20, 20]} className="mb-8">
+          {stats.map((stat, index) => (
+            <Col xs={24} sm={12} md={stat.title.includes('Balance') ? 8 : 4} key={index}>
+              <Card bordered={false} className="shadow-sm rounded-xl h-[120px] border-t-4" style={{ borderTopColor: stat.border }}>
+                <div className="flex flex-col h-full justify-between py-1">
+                  <span className="text-gray-400 text-xs font-medium uppercase tracking-wider">{stat.title}</span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-3xl font-bold text-gray-800">{stat.value}</span>
+                    <span className="text-2xl opacity-80">{stat.icon}</span>
+                  </div>
+                </div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
 
-      {success && (
-        <Alert severity="success" onClose={() => setSuccess('')} sx={{ mb: 2 }}>
-          {success}
-        </Alert>
-      )}
+        {/* Search and Filters Card Overlay */}
+        <Card bordered={false} className="mb-8 shadow-sm rounded-xl p-1">
+          <Row gutter={16}>
+            <Col flex="auto">
+              <Input
+                placeholder="Search by card number or user..."
+                prefix={<SearchOutlined className="text-gray-400 mr-2" />}
+                size="large"
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                className="border-none bg-gray-50/50 hover:bg-white focus:bg-white transition-all rounded-lg"
+                allowClear
+              />
+            </Col>
+            <Col>
+              <Select 
+                size="large" 
+                defaultValue="all" 
+                style={{ width: 180 }} 
+                className="status-dropdown"
+                onChange={setStatusFilter}
+              >
+                <Option value="all">All Status</Option>
+                <Option value="available">Available</Option>
+                <Option value="active">Active</Option>
+                <Option value="blocked">Blocked</Option>
+              </Select>
+            </Col>
+          </Row>
+        </Card>
 
-      <Card sx={{ mb: 3, p: 2 }}>
-        <Stack direction="row" spacing={2}>
-          <TextField
-            placeholder="Search by card number or user name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
+        {/* Table Card */}
+        <Card bordered={false} className="shadow-sm rounded-xl overflow-hidden p-0 mb-8 min-h-[500px]">
+          <Table
+            columns={columns}
+            dataSource={filteredCards}
+            rowKey="id"
+            loading={loading}
+            className="exact-ui-table"
+            pagination={{
+              showSizeChanger: true,
+              pageSize: 10,
+              showTotal: (total) => `Total ${total} cards`,
+              className: "px-6 py-4 border-t",
             }}
-            sx={{ flex: 1 }}
+            locale={{
+              emptyText: (
+                <div className="py-24 flex flex-col items-center">
+                  <div className="w-16 h-16 bg-gray-50 rounded-lg flex items-center justify-center mb-4">
+                    <FileTextOutlined className="text-gray-300 text-3xl" />
+                  </div>
+                  <p className="text-gray-400 text-sm">No data</p>
+                </div>
+              )
+            }}
           />
-          <FormControl sx={{ minWidth: 150 }}>
-            <InputLabel>Status</InputLabel>
-            <Select
-              value={statusFilter}
-              label="Status"
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <MenuItem value="all">All Status</MenuItem>
-              <MenuItem value="active">Active</MenuItem>
-              <MenuItem value="inactive">Inactive</MenuItem>
-              <MenuItem value="blocked">Blocked</MenuItem>
-              <MenuItem value="unassigned">Unassigned</MenuItem>
-            </Select>
-          </FormControl>
-        </Stack>
-      </Card>
+        </Card>
+      </div>
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell><strong>Card UID</strong></TableCell>
-              <TableCell><strong>Assigned To</strong></TableCell>
-              <TableCell><strong>User Type</strong></TableCell>
-              <TableCell><strong>Balance</strong></TableCell>
-              <TableCell><strong>Last Used</strong></TableCell>
-              <TableCell><strong>Status</strong></TableCell>
-              <TableCell><strong>Actions</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  <CircularProgress />
-                </TableCell>
-              </TableRow>
-            ) : filteredCards.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center">
-                  <Typography color="textSecondary">No NFC cards found</Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredCards.map((card) => (
-                <TableRow key={card.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontFamily="monospace" fontWeight="bold">
-                      {card.uid}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {card.user_name ? (
-                      <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
-                        <PersonIcon fontSize="small" sx={{ mr: 0.5 }} />
-                        {card.user_name}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">
-                        Unassigned
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {card.user_type ? (
-                      <Chip
-                        label={card.user_type}
-                        size="small"
-                        color={card.user_type === 'retailer' ? 'primary' : 'secondary'}
-                      />
-                    ) : (
-                      <Typography variant="body2" color="textSecondary">
-                        -
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="medium">
-                      {card.balance.toLocaleString()} RWF
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    {card.last_used ? (
-                      <Typography variant="caption">
-                        {new Date(card.last_used).toLocaleDateString()}
-                      </Typography>
-                    ) : (
-                      <Typography variant="caption" color="textSecondary">
-                        Never
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={card.status}
-                      color={getStatusColor(card.status) as any}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Stack direction="row" spacing={1}>
-                      <Tooltip title="View Details">
-                        <IconButton
-                          size="small"
-                          onClick={() => setDetailsDialog(card)}
-                        >
-                          <VisibilityIcon fontSize="small" />
-                        </IconButton>
-                      </Tooltip>
-                      {card.status === 'active' && (
-                        <Tooltip title="Block">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleCardAction(card.id, 'block')}
-                          >
-                            <BlockIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {(card.status === 'inactive' || card.status === 'blocked') && (
-                        <Tooltip title="Activate">
-                          <IconButton
-                            size="small"
-                            color="success"
-                            onClick={() => handleCardAction(card.id, 'activate')}
-                          >
-                            <ActivateIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      {card.user_id && (
-                        <Tooltip title="Unlink from User">
-                          <IconButton
-                            size="small"
-                            color="warning"
-                            onClick={() => handleCardAction(card.id, 'unlink')}
-                          >
-                            <UnlinkIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                    </Stack>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      {/* Register Modal - Expanded Fields */}
+      <Modal
+        title={<span className="text-lg font-bold flex items-center gap-2"><CreditCardOutlined className="text-[#1890ff]" /> Register New NFC Card</span>}
+        open={createModalVisible}
+        onCancel={() => setCreateModalVisible(false)}
+        footer={null}
+        width={680}
+        className="rounded-xl overflow-hidden"
+        centered
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleRegisterCard}
+          initialValues={{ cardType: 'Personal', province: 'Kigali', pin: '1234' }}
+          className="mt-6 registration-form"
+        >
+          <Row gutter={20}>
+            <Col span={12}>
+              <Form.Item
+                name="uid"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Card Number / UID <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'Card number is required' }]}
+              >
+                <Input size="large" prefix={<CreditCardOutlined className="text-gray-300" />} placeholder="e.g., NFC-007-2024-XXXX" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="cardType"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Card Type <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'Card type is required' }]}
+              >
+                <Select size="large" className="rounded-lg w-full" placeholder="Select card type">
+                  <Option value="Standard NFC Card">Standard NFC Card</Option>
+                  <Option value="Premium Card">Premium Card</Option>
+                  <Option value="Business Card">Business Card</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
 
-      {/* Create Card Dialog */}
-      <Dialog open={createDialog} onClose={() => setCreateDialog(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Register New NFC Card</DialogTitle>
-        <DialogContent>
-          <Box sx={{ pt: 2 }}>
-            <TextField
-              fullWidth
-              label="Card Number"
-              value={newCardNumber}
-              onChange={(e) => setNewCardNumber(e.target.value)}
-              placeholder="Enter NFC card number"
-              autoFocus
-              helperText="Enter the unique NFC card identifier"
-            />
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateDialog(false)}>Cancel</Button>
-          <Button
-            onClick={handleCreateCard}
-            variant="contained"
-            disabled={!newCardNumber.trim()}
+          <Row gutter={20}>
+            <Col span={12}>
+              <Form.Item
+                name="cardholderName"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Cardholder Full Name <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'Name is required' }]}
+              >
+                <Input size="large" prefix={<UserOutlined className="text-gray-300" />} placeholder="Enter full name" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="nationalId"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">National ID Number <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'National ID is required' }]}
+              >
+                <Input size="large" placeholder="e.g., 1199880012345678" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={20}>
+            <Col span={12}>
+              <Form.Item
+                name="phone"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Phone Number <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'Phone is required' }]}
+              >
+                <Input size="large" placeholder="+250788123456" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="email"
+                label={<span className="text-xs font-semibold uppercase text-gray-500">Email Address</span>}
+              >
+                <Input size="large" placeholder="example@email.com" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={20}>
+            <Col span={12}>
+              <Form.Item
+                name="province"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Province <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'Province is required' }]}
+              >
+                <Select size="large" className="rounded-lg">
+                  <Option value="Kigali">Kigali City</Option>
+                  <Option value="Northern">Northern</Option>
+                  <Option value="Southern">Southern</Option>
+                  <Option value="Eastern">Eastern</Option>
+                  <Option value="Western">Western</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="district"
+                label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">District <span className="text-red-500">*</span></span>}
+                rules={[{ required: true, message: 'District is required' }]}
+              >
+                <Input size="large" placeholder="Enter district" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={20}>
+            <Col span={12}>
+              <Form.Item name="sector" label={<span className="text-xs font-semibold uppercase text-gray-500">Sector</span>}>
+                <Input size="large" placeholder="Enter sector" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item name="cell" label={<span className="text-xs font-semibold uppercase text-gray-500">Cell</span>}>
+                <Input size="large" placeholder="Enter cell" className="rounded-lg" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="streetAddress"
+            label={<span className="text-xs font-semibold uppercase text-gray-500">Street Address / Landmark</span>}
           >
-            Register Card
-          </Button>
-        </DialogActions>
-      </Dialog>
+            <TextArea rows={2} placeholder="Additional address details or nearby landmark" className="rounded-lg" />
+          </Form.Item>
 
-      {/* Details Dialog */}
-      <Dialog open={!!detailsDialog} onClose={() => setDetailsDialog(null)} maxWidth="md" fullWidth>
-        <DialogTitle>NFC Card Details</DialogTitle>
-        <DialogContent>
-          {detailsDialog && (
-            <Stack spacing={2} sx={{ mt: 2 }}>
-              <TextField
-                label="Card UID"
-                value={detailsDialog.uid}
-                fullWidth
-                InputProps={{ readOnly: true }}
-              />
-              <TextField
-                label="Assigned To"
-                value={detailsDialog.user_name || 'Unassigned'}
-                fullWidth
-                InputProps={{ readOnly: true }}
-              />
-              {detailsDialog.user_type && (
-                <TextField
-                  label="User Type"
-                  value={detailsDialog.user_type}
-                  fullWidth
-                  InputProps={{ readOnly: true }}
-                />
-              )}
-              <TextField
-                label="Balance"
-                value={`${detailsDialog.balance.toLocaleString()} RWF`}
-                fullWidth
-                InputProps={{ readOnly: true }}
-              />
-              <TextField
-                label="Status"
-                value={detailsDialog.status}
-                fullWidth
-                InputProps={{ readOnly: true }}
-              />
-              <TextField
-                label="Created On"
-                value={new Date(detailsDialog.created_at).toLocaleString()}
-                fullWidth
-                InputProps={{ readOnly: true }}
-              />
-              {detailsDialog.assigned_at && (
-                <TextField
-                  label="Assigned On"
-                  value={new Date(detailsDialog.assigned_at).toLocaleString()}
-                  fullWidth
-                  InputProps={{ readOnly: true }}
-                />
-              )}
-              {detailsDialog.last_used && (
-                <TextField
-                  label="Last Used"
-                  value={new Date(detailsDialog.last_used).toLocaleString()}
-                  fullWidth
-                  InputProps={{ readOnly: true }}
-                />
-              )}
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailsDialog(null)}>Close</Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+          <Form.Item
+              name="pin"
+              label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Initial 4-Digit PIN <span className="text-red-500">*</span></span>}
+              rules={[
+                { required: true, message: 'PIN is required' },
+                { pattern: /^\d{4}$/, message: 'Must be 4 digits' }
+              ]}
+            >
+              <Input.Password size="large" maxLength={4} prefix={<span className="text-gray-300 text-xs">***</span>} placeholder="Enter 4-digit PIN" className="rounded-lg" />
+          </Form.Item>
+
+          <div className="flex justify-end gap-3 mt-8">
+            <Button size="large" onClick={() => setCreateModalVisible(false)} className="rounded-lg h-10 px-6 font-medium">
+              Cancel
+            </Button>
+            <Button type="primary" htmlType="submit" loading={loading} className="bg-[#1890ff] hover:bg-[#40a9ff] border-none h-10 px-8 rounded-lg font-medium shadow-sm">
+              Register Card
+            </Button>
+          </div>
+        </Form>
+      </Modal>
+
+      <style>{`
+        .status-dropdown .ant-select-selector {
+          border-radius: 8px !important;
+          background: #fff !important;
+          border: 1px solid #d9d9d9 !important;
+        }
+        .exact-ui-table .ant-table-thead > tr > th {
+          background: #fafafa !important;
+          border-bottom: 1px solid #f0f0f0 !important;
+          font-weight: 600 !important;
+          color: #262626 !important;
+          font-size: 13px !important;
+        }
+        .exact-ui-table .ant-table-tbody > tr > td {
+          padding: 16px !important;
+          border-bottom: 1px solid #f0f0f0 !important;
+          color: #595959 !important;
+          font-size: 14px !important;
+        }
+        .exact-ui-table .ant-table-row:hover > td {
+          background: #fafafa !important;
+        }
+        .registration-form .ant-form-item {
+          margin-bottom: 16px;
+        }
+        .registration-form .ant-form-item-label {
+          padding-bottom: 4px;
+        }
+      `}</style>
+    </div>
   );
 };
 

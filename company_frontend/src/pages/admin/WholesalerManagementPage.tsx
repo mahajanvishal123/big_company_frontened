@@ -13,7 +13,9 @@ import {
   Row,
   Col,
   Select,
-  Tooltip
+  Tooltip,
+  Alert,
+  Divider
 } from 'antd';
 import {
   PlusOutlined,
@@ -24,7 +26,12 @@ import {
   SearchOutlined,
   CheckCircleOutlined,
   CloseCircleOutlined,
-  StopOutlined
+  StopOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  LockOutlined,
+  EnvironmentOutlined,
+  InfoCircleOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
@@ -61,7 +68,7 @@ const WholesalerManagementPage: React.FC = () => {
     setLoading(true);
     try {
       const response = await adminApi.getWholesalers();
-      if (response.data?.wholesalers) {
+      if (response.data?.success) {
         const mappedWholesalers = response.data.wholesalers.map((w: any) => ({
           id: w.id,
           business_name: w.companyName,
@@ -73,11 +80,7 @@ const WholesalerManagementPage: React.FC = () => {
           created_at: w.createdAt
         }));
 
-        const filtered = statusFilter === 'all'
-          ? mappedWholesalers
-          : mappedWholesalers.filter((w: Wholesaler) => w.status === statusFilter);
-
-        setWholesalers(filtered);
+        setWholesalers(mappedWholesalers);
       }
     } catch (error: any) {
       console.error('Failed to load wholesalers:', error);
@@ -97,7 +100,7 @@ const WholesalerManagementPage: React.FC = () => {
           phone: values.phone,
           address: values.location,
         });
-        message.success('Wholesaler updated successfully');
+        message.success('Wholesaler profile updated successfully');
       } else {
         await adminApi.createWholesaler({
           company_name: values.business_name,
@@ -106,14 +109,14 @@ const WholesalerManagementPage: React.FC = () => {
           password: values.password,
           address: values.location,
         });
-        message.success('Wholesaler created successfully');
+        message.success('Wholesaler account created successfully');
       }
       setModalVisible(false);
       form.resetFields();
       setEditingId(null);
       loadWholesalers();
     } catch (error: any) {
-      message.error(error.response?.data?.message || 'Failed to save wholesaler');
+      message.error(error.response?.data?.error || 'Failed to save wholesaler');
     } finally {
       setLoading(false);
     }
@@ -132,9 +135,9 @@ const WholesalerManagementPage: React.FC = () => {
 
   const handleDelete = (id: string, name: string) => {
     Modal.confirm({
-      title: 'Delete Wholesaler',
-      content: `Are you sure you want to delete ${name}? This action cannot be undone.`,
-      okText: 'Delete',
+      title: 'Delete Wholesaler Account',
+      content: `Are you sure you want to delete the account for ${name}? This will remove their access to the system.`,
+      okText: 'Delete Account',
       okType: 'danger',
       onOk: async () => {
         try {
@@ -152,7 +155,7 @@ const WholesalerManagementPage: React.FC = () => {
     const newStatus = record.status === 'active' ? false : true;
     try {
       await adminApi.updateWholesalerStatus(record.id, newStatus);
-      message.success(`Wholesaler ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      message.success(`Account ${newStatus ? 'activated' : 'deactivated'} successfully`);
       loadWholesalers();
     } catch (error: any) {
       message.error('Failed to update status');
@@ -160,147 +163,181 @@ const WholesalerManagementPage: React.FC = () => {
   };
 
   const filteredWholesalers = wholesalers.filter(w => {
-    return (
+    const matchesSearch = !searchText || (
       w.business_name?.toLowerCase().includes(searchText.toLowerCase()) ||
       w.contact_person?.toLowerCase().includes(searchText.toLowerCase()) ||
       w.phone?.includes(searchText) ||
       w.email?.toLowerCase().includes(searchText.toLowerCase())
     );
+    const matchesStatus = statusFilter === 'all' || w.status === statusFilter;
+    return matchesSearch && matchesStatus;
   });
 
   const columns: ColumnsType<Wholesaler> = [
     {
-      title: 'Business Name',
+      title: 'COMPANY NAME',
       key: 'business_name',
       render: (_, record) => (
-        <Space>
-          <BankOutlined />
-          <strong>{record.business_name}</strong>
+        <Space direction="vertical" size={0}>
+          <Text strong style={{ color: '#1890ff' }}>{record.business_name}</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id.slice(0, 8)}</Text>
         </Space>
       ),
     },
     {
-      title: 'Contact Person',
+      title: 'CONTACT PERSON',
       dataIndex: 'contact_person',
       key: 'contact_person',
+      render: (text) => <Text strong>{text}</Text>
     },
     {
-      title: 'Contact',
+      title: 'CONTACT INFO',
       key: 'contact',
       render: (_, record) => (
-        <div style={{ fontSize: '12px' }}>
-          <div>{record.phone}</div>
-          <div style={{ color: '#888' }}>{record.email}</div>
-        </div>
+        <Space direction="vertical" size={0}>
+          <Space><PhoneOutlined style={{ fontSize: '12px', color: '#8c8c8c' }} /> <Text style={{ fontSize: '13px' }}>{record.phone}</Text></Space>
+          <Space><MailOutlined style={{ fontSize: '12px', color: '#8c8c8c' }} /> <Text type="secondary" style={{ fontSize: '12px' }}>{record.email}</Text></Space>
+        </Space>
       ),
     },
     {
-      title: 'Location',
+      title: 'LOCATION',
       dataIndex: 'location',
       key: 'location',
+      render: (text) => text || 'N/A'
     },
     {
-      title: 'Status',
+      title: 'STATUS',
       key: 'status',
       render: (_, record) => {
-        let color = 'default';
-        let icon = null;
-        if (record.status === 'active') { color = 'green'; icon = <CheckCircleOutlined />; }
-        else if (record.status === 'suspended') { color = 'red'; icon = <StopOutlined />; }
-        else if (record.status === 'inactive') { color = 'red'; icon = <CloseCircleOutlined />; }
-        else if (record.status === 'pending') { color = 'gold'; }
-
+        const isActive = record.status === 'active';
         return (
-          <Tag color={color} icon={icon}>
-            {record.status.toUpperCase()}
+          <Tag color={isActive ? 'success' : 'error'} style={{ borderRadius: '4px', textTransform: 'uppercase', fontWeight: 600 }}>
+            {isActive ? 'Active' : 'Deactivated'}
           </Tag>
         );
       },
     },
     {
-      title: 'Actions',
+      title: 'ACTIONS',
       key: 'actions',
+      align: 'right',
       render: (_, record) => (
         <Space>
-          <Tooltip title="Edit">
+          <Tooltip title="Edit Profile">
             <Button
-              type="primary"
-              ghost
-              icon={<EditOutlined />}
-              size="small"
+              type="text"
+              icon={<EditOutlined style={{ color: '#1890ff' }} />}
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-
           <Tooltip title={record.status === 'active' ? "Deactivate" : "Activate"}>
             <Button
-              type={record.status === 'active' ? 'default' : 'primary'}
-              danger={record.status === 'active'}
-              icon={record.status === 'active' ? <StopOutlined /> : <CheckCircleOutlined />}
-              size="small"
+              type="text"
+              icon={record.status === 'active' ? <StopOutlined style={{ color: '#ff4d4f' }} /> : <CheckCircleOutlined style={{ color: '#52c41a' }} />}
               onClick={() => handleStatusChange(record)}
             />
           </Tooltip>
-
-          <Tooltip title="Delete">
-            <Button
-              type="primary"
-              danger
-              icon={<DeleteOutlined />}
-              size="small"
-              onClick={() => handleDelete(record.id, record.business_name)}
-            />
-          </Tooltip>
+          <Button
+            type="text"
+            danger
+            icon={<DeleteOutlined />}
+            onClick={() => handleDelete(record.id, record.business_name)}
+          />
         </Space>
       ),
     },
   ];
 
+  const stats = [
+    { title: 'Total Wholesalers', value: wholesalers.length, color: '#1890ff' },
+    { title: 'Active Accounts', value: wholesalers.filter(w => w.status === 'active').length, color: '#52c41a' },
+    { title: 'Pending Approval', value: wholesalers.filter(w => w.status === 'pending').length, color: '#faad14' },
+  ];
+
   return (
-    <div>
-      <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <Title level={2} style={{ margin: 0 }}>Wholesaler Management</Title>
-          <Text type="secondary">Manage wholesaler accounts</Text>
-        </div>
-        <Space>
-          <Button icon={<ReloadOutlined />} onClick={loadWholesalers}>Refresh</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => {
-            setEditingId(null);
-            form.resetFields();
-            setModalVisible(true);
-          }}>
-            Add Wholesaler
-          </Button>
-        </Space>
+    <div style={{ background: '#f0f2f5', minHeight: '100vh' }}>
+      {/* Blue Header Banner */}
+      <div style={{ 
+        background: 'linear-gradient(135deg, #1890ff 0%, #096dd9 100%)', 
+        padding: '32px 24px', 
+        color: 'white',
+        marginBottom: '24px'
+      }}>
+        <Row justify="space-between" align="middle">
+          <Col>
+            <Title level={2} style={{ color: 'white', margin: 0 }}>Wholesaler Management</Title>
+            <Text style={{ color: 'rgba(255,255,255,0.85)' }}>Manage and monitor all distribution partners and wholesalers</Text>
+          </Col>
+          <Col>
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              size="large"
+              style={{ background: 'white', color: '#1890ff', border: 'none', fontWeight: 600 }}
+              onClick={() => {
+                setEditingId(null);
+                form.resetFields();
+                setModalVisible(true);
+              }}
+            >
+              CREATE NEW WHOLESALER
+            </Button>
+          </Col>
+        </Row>
       </div>
 
-      <Card>
-        <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between' }}>
-          <Input
-            prefix={<SearchOutlined />}
-            placeholder="Search by name, contact, email, or phone"
-            style={{ width: 300 }}
-            value={searchText}
-            onChange={e => setSearchText(e.target.value)}
-          />
-          <Select defaultValue="all" style={{ width: 120 }} onChange={setStatusFilter}>
-            <Option value="all">All Status</Option>
-            <Option value="active">Active</Option>
-            <Option value="inactive">Inactive</Option>
-          </Select>
-        </div>
-        <Table
-          columns={columns}
-          dataSource={filteredWholesalers}
-          rowKey="id"
-          loading={loading}
-          pagination={{ pageSize: 10 }}
-        />
-      </Card>
+      <div style={{ padding: '0 24px 24px' }}>
+        {/* Stats Row */}
+        <Row gutter={16} style={{ marginBottom: 24 }}>
+          {stats.map((stat, index) => (
+            <Col span={8} key={index}>
+              <Card bordered={false} bodyStyle={{ padding: '20px' }} style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+                <Text type="secondary" style={{ fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{stat.title}</Text>
+                <div style={{ fontSize: '24px', fontWeight: 700, color: stat.color, marginTop: '8px' }}>{stat.value}</div>
+              </Card>
+            </Col>
+          ))}
+        </Row>
 
+        <Card bordered={false} style={{ borderRadius: '8px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+          <div style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between' }}>
+            <Input
+              prefix={<SearchOutlined style={{ color: '#bfbfbf' }} />}
+              placeholder="Search by company name or email..."
+              style={{ width: 400, borderRadius: '6px' }}
+              size="large"
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+            />
+            <Space>
+              <Text strong>Filter by:</Text>
+              <Select defaultValue="all" style={{ width: 140 }} onChange={setStatusFilter}>
+                <Option value="all">All Status</Option>
+                <Option value="active">Active</Option>
+                <Option value="inactive">Inactive</Option>
+              </Select>
+              <Button icon={<ReloadOutlined />} onClick={loadWholesalers}>Refresh</Button>
+            </Space>
+          </div>
+          <Table
+            columns={columns}
+            dataSource={filteredWholesalers}
+            rowKey="id"
+            loading={loading}
+            pagination={{ pageSize: 10, showSizeChanger: true }}
+            style={{ borderRadius: '8px' }}
+          />
+        </Card>
+      </div>
+
+      {/* Modern Creation Modal */}
       <Modal
-        title={editingId ? 'Edit Wholesaler' : 'Add Wholesaler'}
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <BankOutlined /> {editingId ? 'Edit Wholesaler Profile' : 'Create Wholesaler Account'}
+          </div>
+        }
         open={modalVisible}
         onCancel={() => {
           setModalVisible(false);
@@ -308,77 +345,103 @@ const WholesalerManagementPage: React.FC = () => {
           setEditingId(null);
         }}
         footer={null}
-        width={700}
+        width={650}
+        style={{ top: 20 }}
       >
         <Form
           form={form}
           layout="vertical"
           onFinish={handleSave}
+          requiredMark="optional"
+          style={{ paddingTop: 10 }}
         >
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item
-                name="business_name"
-                label="Company / Business Name"
-                rules={[{ required: true, message: 'Required' }]}
-              >
-                <Input placeholder="Global Traders Ltd" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item
-                name="phone"
-                label="Phone"
-                rules={[{ required: true, message: 'Required' }]}
-              >
-                <Input placeholder="+250..." />
-              </Form.Item>
-            </Col>
-          </Row>
+          {!editingId && (
+             <Alert
+               message="An activation email will be sent to the wholesaler."
+               type="info"
+               showIcon
+               style={{ marginBottom: 24, borderRadius: '8px' }}
+             />
+          )}
+
+          <Form.Item
+            name="business_name"
+            label={<Text strong>Company Name <Text type="danger">*</Text></Text>}
+            rules={[{ required: true, message: 'Please enter company name' }]}
+          >
+            <Input prefix={<BankOutlined style={{ color: '#bfbfbf' }} />} placeholder="e.g., BIG Company Rwanda Ltd" size="large" />
+          </Form.Item>
 
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item
                 name="email"
-                label="Email"
-                rules={[{ required: true, type: 'email' }]}
+                label={<Text strong>Email <Text type="danger">*</Text></Text>}
+                rules={[{ required: true, type: 'email', message: 'Valid email required' }]}
               >
-                <Input placeholder="info@globaltraders.com" />
+                <Input prefix={<MailOutlined style={{ color: '#bfbfbf' }} />} placeholder="wholesaler@example.com" size="large" />
               </Form.Item>
             </Col>
-            {!editingId && (
-              <Col span={12}>
-                <Form.Item
-                  name="password"
-                  label="Password"
-                  rules={[{ required: true, min: 8 }]}
-                >
-                  <Input.Password placeholder="Min 8 chars" />
-                </Form.Item>
-              </Col>
-            )}
+            <Col span={12}>
+              <Form.Item
+                name="phone"
+                label={<Text strong>Phone <Text type="danger">*</Text></Text>}
+                rules={[{ required: true, message: 'Phone number required' }]}
+              >
+                <Input prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />} placeholder="+250788123456" size="large" />
+              </Form.Item>
+            </Col>
           </Row>
+
+          {!editingId && (
+            <Form.Item
+              name="password"
+              label={<Text strong>Initial Password <Text type="danger">*</Text></Text>}
+              rules={[{ required: true, min: 8, message: 'Minimum 8 characters' }]}
+            >
+              <Input.Password prefix={<LockOutlined style={{ color: '#bfbfbf' }} />} placeholder="Temporary password" size="large" />
+            </Form.Item>
+          )}
 
           <Form.Item
             name="location"
-            label="Address / Location"
+            label={<Text strong>Business Address</Text>}
           >
-            <TextArea rows={2} placeholder="Kigali, Rwanda..." />
+            <TextArea rows={3} placeholder="Street, District, City" style={{ borderRadius: '8px' }} />
           </Form.Item>
 
+          <Divider style={{ margin: '24px 0 16px' }} />
+
           <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
-            <Space>
-              <Button onClick={() => setModalVisible(false)}>Cancel</Button>
-              <Button type="primary" htmlType="submit" loading={loading}>
-                {editingId ? 'Update' : 'Create'}
+            <Space size="middle">
+              <Button onClick={() => setModalVisible(false)} size="large" style={{ borderRadius: '6px', minWidth: 100 }}>
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" loading={loading} size="large" style={{ borderRadius: '6px', background: '#1890ff', minWidth: 150 }}>
+                {editingId ? 'Update Profile' : 'Create Account'}
               </Button>
             </Space>
           </Form.Item>
         </Form>
       </Modal>
+
+      <style>{`
+        .ant-table-thead > tr > th {
+          background: #fafafa;
+          font-weight: 700;
+          font-size: 11px;
+          letter-spacing: 0.5px;
+          color: #8c8c8c;
+        }
+        .ant-card {
+          border-radius: 8px;
+        }
+        .ant-btn-primary {
+          box-shadow: 0 2px 0 rgba(24, 144, 255, 0.1);
+        }
+      `}</style>
     </div>
   );
 };
 
 export default WholesalerManagementPage;
-

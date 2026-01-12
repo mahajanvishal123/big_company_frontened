@@ -49,6 +49,7 @@ import ProfileSettingsPage from './pages/shared/ProfileSettingsPage';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AccountManagementPage from './pages/admin/AccountManagementPage';
+import { ProductListingPage } from './pages/admin/ProductListingPage';
 import CategoriesPage from './pages/admin/CategoriesPage';
 import RetailerManagementPage from './pages/admin/RetailerManagementPage';
 import WholesalerManagementPage from './pages/admin/WholesalerManagementPage';
@@ -62,6 +63,7 @@ import PayrollProcessingPage from './pages/admin/PayrollProcessingPage';
 import RecruitmentPage from './pages/admin/RecruitmentPage';
 import VendorManagementPage from './pages/admin/VendorManagementPage';
 import DealsPage from './pages/admin/DealsPage';
+import PricingConfigPage from './pages/admin/PricingConfigPage';
 
 // Placeholder for pages not yet implemented
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -174,12 +176,14 @@ function App() {
               <Route index element={<Navigate to="/admin/dashboard" replace />} />
               <Route path="dashboard" element={<AdminDashboard />} />
               <Route path="accounts" element={<AccountManagementPage />} />
+              <Route path="products" element={<ProductListingPage />} />
               <Route path="categories" element={<CategoriesPage />} />
               <Route path="customers" element={<CustomerManagementPage />} />
               <Route path="retailers" element={<RetailerManagementPage />} />
               <Route path="wholesalers" element={<WholesalerManagementPage />} />
               <Route path="loans" element={<LoanManagementPage />} />
               <Route path="nfc-cards" element={<NFCCardManagementPage />} />
+              <Route path="pricing-config" element={<PricingConfigPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="profile" element={<ProfileSettingsPage />} />
             </Route>

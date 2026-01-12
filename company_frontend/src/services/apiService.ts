@@ -533,8 +533,21 @@ export const adminApi = {
 
   // NFC Cards
   getNFCCards: (params?: any) => api.get("/admin/nfc-cards", { params }),
-  registerNFCCard: (uid: string, pin?: string) =>
-    api.post("/admin/nfc-cards", { uid, pin }),
+  registerNFCCard: (data: {
+    uid: string;
+    pin?: string;
+    cardType?: string;
+    cardholderName?: string;
+    nationalId?: string;
+    phone?: string;
+    email?: string;
+    province?: string;
+    district?: string;
+    sector?: string;
+    cell?: string;
+    streetAddress?: string;
+    landmark?: string;
+  }) => api.post("/admin/nfc-cards", data),
   blockNFCCard: (id: string) =>
     api.put(`/admin/nfc-cards/${id}/block`),
   activateNFCCard: (id: string) =>
@@ -558,10 +571,23 @@ export const adminApi = {
   // Audit Logs
   getAuditLogs: (params?: any) => api.get("/admin/audit-logs", { params }),
 
+  // Products
+  getProducts: (params?: any) => api.get("/admin/products", { params }),
+  createProduct: (data: any) => api.post("/admin/products", data),
+  updateProduct: (id: string, data: any) => api.put(`/admin/products/${id}`, data),
+  deleteProduct: (id: string) => api.delete(`/admin/products/${id}`),
+
   // Settings
   getSettings: () => api.get("/admin/settings"),
   updateSettings: (settings: Record<string, any>) =>
     api.post("/admin/settings", { settings }),
+
+  // System Config
+  getSystemConfig: () => api.get("/admin/system-config"),
+  updateSystemConfig: (data: any) => api.put("/admin/system-config", data),
+
+  // Reports
+  getReports: (params?: any) => api.get("/admin/reports", { params }),
 };
 
 // General Auth APIs (Protected)
