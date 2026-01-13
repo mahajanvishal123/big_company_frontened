@@ -41,7 +41,7 @@ const { Text } = Typography;
 const { Option } = Select;
 
 interface Loan {
-  id: string;
+  id: number;
   user_id: string;
   user_name: string;
   user_type: 'retailer' | 'wholesaler' | 'consumer';
@@ -134,7 +134,7 @@ const LoanManagementPage: React.FC = () => {
       render: (_, record) => (
         <Space direction="vertical" size={0}>
           <Text strong>{record.user_name}</Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id.substring(0, 8)}...</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id}</Text>
         </Space>
       ),
     },
@@ -212,7 +212,7 @@ const LoanManagementPage: React.FC = () => {
   const filteredLoans = loans.filter(
     (loan) =>
       loan.user_name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      loan.id?.toLowerCase().includes(searchText.toLowerCase())
+      loan.id?.toString().includes(searchText)
   );
 
   const stats = [

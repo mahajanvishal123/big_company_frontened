@@ -136,15 +136,8 @@ export const AppLayout: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    // Redirect to appropriate login page based on user role
-    const loginUrls: Record<UserRole, string> = {
-      consumer: '/login',
-      employee: '/employee/login',
-      retailer: '/login',
-      wholesaler: '/login',
-      admin: '/admin/login',
-    };
-    window.location.href = loginUrls[user.role];
+    // Redirect to home page after logout
+    window.location.href = '/';
   };
 
   const userMenuItems = [
@@ -346,14 +339,21 @@ export const AppLayout: React.FC = () => {
   // Desktop Layout
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {/* Sidebar */}
+      {/* Sidebar - Fixed */}
       <Sider
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
         theme="light"
         style={{
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          height: '100vh',
+          overflow: 'auto',
           boxShadow: '2px 0 8px rgba(0,0,0,0.1)',
+          zIndex: 100,
         }}
       >
         {/* Logo */}
@@ -392,16 +392,22 @@ export const AppLayout: React.FC = () => {
         />
       </Sider>
 
-      <Layout>
-        {/* Header */}
+      <Layout style={{ marginLeft: collapsed ? 80 : 200, transition: 'margin-left 0.2s' }}>
+        {/* Header - Fixed */}
         <Header
           style={{
+            position: 'fixed',
+            top: 0,
+            right: 0,
+            left: collapsed ? 80 : 200,
             background: '#fff',
             padding: '0 24px',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+            zIndex: 99,
+            transition: 'left 0.2s',
           }}
         >
           <Space>
@@ -457,14 +463,15 @@ export const AppLayout: React.FC = () => {
           </Dropdown>
         </Header>
 
-        {/* Content */}
+        {/* Content - Scrollable */}
         <Content
           style={{
-            margin: 24,
+            marginTop: 64,
             padding: 24,
             background: '#fff',
             borderRadius: 8,
             minHeight: 'calc(100vh - 64px - 48px)',
+            overflow: 'auto',
           }}
         >
           <Outlet />

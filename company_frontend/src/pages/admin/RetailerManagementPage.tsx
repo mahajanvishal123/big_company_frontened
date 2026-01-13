@@ -32,7 +32,8 @@ import {
   PhoneOutlined,
   LockOutlined,
   EnvironmentOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
@@ -42,7 +43,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 interface Retailer {
-  id: string;
+  id: number;
   store_name: string;
   owner_name: string;
   phone: string;
@@ -58,7 +59,9 @@ const RetailerManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedRetailer, setSelectedRetailer] = useState<any>(null);
   const [form] = Form.useForm();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -99,7 +102,7 @@ const RetailerManagementPage: React.FC = () => {
     try {
       setLoading(true);
       if (editingId) {
-        await adminApi.updateRetailer(editingId, {
+        await adminApi.updateRetailer(editingId.toString(), {
           business_name: values.store_name,
           email: values.email,
           phone: values.phone,
@@ -143,7 +146,7 @@ const RetailerManagementPage: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = (id: number, name: string) => {
     Modal.confirm({
       title: 'Delete Retailer Account',
       content: `Are you sure you want to permanently delete the account for ${name}? This action cannot be undone.`,
@@ -151,7 +154,7 @@ const RetailerManagementPage: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await adminApi.deleteRetailer(id);
+          await adminApi.deleteRetailer(id.toString());
           message.success('Retailer deleted successfully');
           loadRetailers();
         } catch (error: any) {
@@ -164,11 +167,25 @@ const RetailerManagementPage: React.FC = () => {
   const handleStatusChange = async (record: Retailer) => {
     const newStatus = record.status === 'active' ? false : true;
     try {
-      await adminApi.updateRetailerStatus(record.id, newStatus);
+      await adminApi.updateRetailerStatus(record.id.toString(), newStatus);
       message.success(`Account ${newStatus ? 'activated' : 'deactivated'} successfully`);
       loadRetailers();
     } catch (error: any) {
       message.error('Failed to update status');
+    }
+  };
+
+  const handleView = async (record: Retailer) => {
+    try {
+      const response = await adminApi.getRetailer(record.id.toString());
+      if (response.data?.success) {
+        setSelectedRetailer(response.data.retailer);
+        setViewModalVisible(true);
+      }
+    } catch (error) {
+      // If detailed API fails, use table data
+      setSelectedRetailer(record);
+      setViewModalVisible(true);
     }
   };
 
@@ -190,7 +207,7 @@ const RetailerManagementPage: React.FC = () => {
       render: (_, record) => (
         <Space direction="vertical" size={0}>
           <Text strong style={{ color: '#1890ff' }}>{record.store_name}</Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id.slice(0, 8)}</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id}</Text>
         </Space>
       ),
     },
@@ -234,6 +251,13 @@ const RetailerManagementPage: React.FC = () => {
       align: 'right',
       render: (_, record) => (
         <Space>
+          <Tooltip title="View Details">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => handleView(record)}
+            />
+          </Tooltip>
           <Tooltip title="Edit Profile">
             <Button
               type="text"
@@ -449,6 +473,105 @@ const RetailerManagementPage: React.FC = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Retailer Details Modal */}
+      <Modal
+        title={<span className="text-lg font-bold">Retailer Details</span>}
+        open={viewModalVisible}
+        onCancel={() => {
+          setViewModalVisible(false);
+          setSelectedRetailer(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setViewModalVisible(false);
+            setSelectedRetailer(null);
+          }}>
+            Close
+          </Button>
+        ]}
+        width={800}
+        centered
+      >
+        {selectedRetailer && (
+          <div className="py-4">
+            <Row gutter={[24, 24]}>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Retailer ID</Text><br/>
+                <Text strong className="text-base">{selectedRetailer.id}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Status</Text><br/>
+                <Tag color={selectedRetailer.status === 'active' ? 'green' : 'red'}>
+                  {selectedRetailer.status?.toUpperCase()}
+                </Tag>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <Text strong className="text-sm">Business Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Business Name</Text><br/>
+                <Text strong>{selectedRetailer.store_name || selectedRetailer.shopName}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Owner Name</Text><br/>
+                <Text>{selectedRetailer.owner_name || selectedRetailer.user?.name || 'N/A'}</Text>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                  <Text strong className="text-sm">Contact Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Phone</Text><br/>
+                <Text>{selectedRetailer.phone || selectedRetailer.user?.phone}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Email</Text><br/>
+                <Text>{selectedRetailer.email || selectedRetailer.user?.email}</Text>
+              </Col>
+              <Col span={24}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Business Address</Text><br/>
+                <Text>{selectedRetailer.location || selectedRetailer.address || 'N/A'}</Text>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                  <Text strong className="text-sm">Financial Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Credit Limit</Text><br/>
+                <Text strong className="text-lg text-blue-600">{(selectedRetailer.credit_limit || selectedRetailer.creditLimit || 0).toLocaleString()} RWF</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Current Balance</Text><br/>
+                <Text strong className="text-lg">{(selectedRetailer.current_balance || 0).toLocaleString()} RWF</Text>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                  <Text strong className="text-sm">Account Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Created At</Text><br/>
+                <Text>{selectedRetailer.created_at ? new Date(selectedRetailer.created_at).toLocaleString() : selectedRetailer.createdAt ? new Date(selectedRetailer.createdAt).toLocaleString() : 'N/A'}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Account Status</Text><br/>
+                <Tag color={selectedRetailer.user?.isActive ? 'green' : 'red'}>
+                  {selectedRetailer.user?.isActive ? 'Active' : 'Inactive'}
+                </Tag>
+              </Col>
+            </Row>
+          </div>
+        )}
       </Modal>
 
       <style>{`

@@ -74,11 +74,13 @@ const NFCCardManagementPage: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<NFCCard | null>(null);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [customers, setCustomers] = useState<any[]>([]);
 
   const [form] = Form.useForm();
 
   useEffect(() => {
     fetchCards();
+    fetchCustomers();
   }, []);
 
   const fetchCards = async () => {
@@ -96,12 +98,24 @@ const NFCCardManagementPage: React.FC = () => {
     }
   };
 
+  const fetchCustomers = async () => {
+    try {
+      const response = await adminApi.getCustomers();
+      if (response.data.success) {
+        setCustomers(response.data.customers || []);
+      }
+    } catch (err) {
+      console.error('Error fetching customers:', err);
+    }
+  };
+
   const handleRegisterCard = async (values: any) => {
     setLoading(true);
     try {
       const data = {
         ...values,
-        pin: values.pin?.toString() || '1234'
+        pin: values.pin?.toString() || '1234',
+        userId: values.userId // Pass the selected user ID if any
       };
       
       const response = await adminApi.registerNFCCard(data);
@@ -116,6 +130,13 @@ const NFCCardManagementPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const generateUid = () => {
+    const year = new Date().getFullYear();
+    const random = Math.floor(100000 + Math.random() * 900000); // 6 digit random
+    const uid = `NFC-${year}-${random}`;
+    form.setFieldsValue({ uid });
   };
 
   const handleCardAction = async (cardId: string, action: 'activate' | 'block' | 'unlink') => {
@@ -356,7 +377,17 @@ const NFCCardManagementPage: React.FC = () => {
                 label={<span className="text-xs font-semibold uppercase text-gray-500 flex gap-1">Card Number / UID <span className="text-red-500">*</span></span>}
                 rules={[{ required: true, message: 'Card number is required' }]}
               >
-                <Input size="large" prefix={<CreditCardOutlined className="text-gray-300" />} placeholder="e.g., NFC-007-2024-XXXX" className="rounded-lg" />
+                <Input 
+                  size="large" 
+                  prefix={<CreditCardOutlined className="text-gray-300" />} 
+                  placeholder="e.g., NFC-007-2024-XXXX" 
+                  className="rounded-lg"
+                  addonAfter={
+                    <Tooltip title="Auto Generate Card Number">
+                      <ReloadOutlined onClick={generateUid} style={{ cursor: 'pointer', color: '#1890ff' }} />
+                    </Tooltip>
+                  }
+                />
               </Form.Item>
             </Col>
             <Col span={12}>
@@ -369,6 +400,45 @@ const NFCCardManagementPage: React.FC = () => {
                   <Option value="Standard NFC Card">Standard NFC Card</Option>
                   <Option value="Premium Card">Premium Card</Option>
                   <Option value="Business Card">Business Card</Option>
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={20}>
+            <Col span={24}>
+              <Form.Item
+                name="userId"
+                label={<span className="text-xs font-semibold uppercase text-gray-500">Link to Customer (Optional)</span>}
+              >
+                <Select
+                  showSearch
+                  placeholder="Select a customer to auto-fill details"
+                  optionFilterProp="children"
+                  filterOption={(input, option: any) =>
+                    (option?.children ?? '').toLowerCase().includes(input.toLowerCase())
+                  }
+                  onChange={(value) => {
+                    const customer = customers.find((c) => c.user?.id === value || c.id === value);
+                    if (customer) {
+                      form.setFieldsValue({
+                        cardholderName: customer.fullName || customer.user?.name,
+                        phone: customer.user?.phone || customer.phone,
+                        email: customer.user?.email || customer.email,
+                        nationalId: customer.nationalId || '',
+                        province: customer.province || 'Kigali',
+                      });
+                    }
+                  }}
+                  size="large"
+                  className="rounded-lg w-full"
+                >
+                  <Option value="">None (Unassigned)</Option>
+                  {customers.map((customer) => (
+                    <Option key={customer.user?.id} value={customer.user?.id}>
+                      {customer.fullName} ({customer.user?.phone})
+                    </Option>
+                  ))}
                 </Select>
               </Form.Item>
             </Col>
@@ -482,6 +552,118 @@ const NFCCardManagementPage: React.FC = () => {
             </Button>
           </div>
         </Form>
+      </Modal>
+
+      {/* Card Details Modal */}
+      <Modal
+        title={<span className="text-lg font-bold">NFC Card Details</span>}
+        open={detailsModalVisible}
+        onCancel={() => {
+          setDetailsModalVisible(false);
+          setSelectedCard(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setDetailsModalVisible(false);
+            setSelectedCard(null);
+          }}>
+            Close
+          </Button>
+        ]}
+        width={700}
+        centered
+      >
+        {selectedCard && (
+          <div className="py-4">
+            <Row gutter={[24, 24]}>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Card Number (UID)</Text><br/>
+                <Text strong className="text-base">{selectedCard.uid}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Status</Text><br/>
+                <Tag color={
+                  selectedCard.status === 'active' || selectedCard.status === 'available' ? 'green' :
+                    selectedCard.status === 'blocked' ? 'red' : 'orange'
+                }>
+                  {selectedCard.status?.toUpperCase()}
+                </Tag>
+              </Col>
+
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Balance</Text><br/>
+                <Text strong className="text-lg text-green-600">{selectedCard.balance?.toLocaleString() || 0} RWF</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Last Used</Text><br/>
+                <Text>{selectedCard.last_used ? new Date(selectedCard.last_used).toLocaleString() : 'Never'}</Text>
+              </Col>
+
+              {selectedCard.cardholderName && (
+                <>
+                  <Col span={24}>
+                    <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                      <Text strong className="text-sm">Cardholder Information</Text>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Full Name</Text><br/>
+                    <Text>{selectedCard.cardholderName}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">National ID</Text><br/>
+                    <Text>{selectedCard.nationalId || '-'}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Phone</Text><br/>
+                    <Text>{selectedCard.phone || '-'}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Email</Text><br/>
+                    <Text>{selectedCard.email || '-'}</Text>
+                  </Col>
+
+                  <Col span={24}>
+                    <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                      <Text strong className="text-sm">Address Information</Text>
+                    </div>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Province</Text><br/>
+                    <Text>{selectedCard.province || '-'}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">District</Text><br/>
+                    <Text>{selectedCard.district || '-'}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Sector</Text><br/>
+                    <Text>{selectedCard.sector || '-'}</Text>
+                  </Col>
+                  <Col span={12}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Cell</Text><br/>
+                    <Text>{selectedCard.cell || '-'}</Text>
+                  </Col>
+                  <Col span={24}>
+                    <Text type="secondary" className="text-xs uppercase font-semibold">Street Address / Landmark</Text><br/>
+                    <Text>{selectedCard.streetAddress || selectedCard.landmark || '-'}</Text>
+                  </Col>
+                </>
+              )}
+
+              {!selectedCard.cardholderName && (
+                <Col span={24}>
+                  <Alert
+                    message="Unassigned Card"
+                    description="This card has not been assigned to any user yet."
+                    type="info"
+                    showIcon
+                  />
+                </Col>
+              )}
+            </Row>
+          </div>
+        )}
       </Modal>
 
       <style>{`

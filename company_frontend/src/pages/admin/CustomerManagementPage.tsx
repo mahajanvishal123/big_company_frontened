@@ -42,13 +42,13 @@ const { Title, Text } = Typography;
 const { Option } = Select;
 
 interface Customer {
-  id: string; // ConsumerProfile ID
+  id: number; // ConsumerProfile ID
   fullName: string | null;
   gasBalance?: string;
   totalSpent?: number;
   orderCount?: number;
   user: {
-    id: string;
+    id: number;
     name: string;
     email: string;
     phone: string;
@@ -60,7 +60,9 @@ const CustomerManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
   const [form] = Form.useForm();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -77,6 +79,7 @@ const CustomerManagementPage: React.FC = () => {
         // Add some mock data for fields shown in design but might not be in API yet
         const enrichedCustomers = response.data.customers.map((c: any) => ({
           ...c,
+          id: c.id,
           gasBalance: (Math.random() * 15).toFixed(2) + " M³",
           totalSpent: Math.floor(Math.random() * 1000000),
           orderCount: Math.floor(Math.random() * 50)
@@ -95,7 +98,7 @@ const CustomerManagementPage: React.FC = () => {
     try {
       setLoading(true);
       if (editingId) {
-        await adminApi.updateCustomer(editingId, values);
+        await adminApi.updateCustomer(editingId.toString(), values);
         message.success('Customer updated successfully');
       } else {
         await adminApi.createCustomer(values);
@@ -115,7 +118,10 @@ const CustomerManagementPage: React.FC = () => {
   const handleToggleStatus = async (record: Customer) => {
     const newStatus = !record.user?.isActive;
     try {
-      await adminApi.updateCustomerStatus(record.user.id, newStatus);
+      // API expects string status in data object
+      await adminApi.updateCustomerStatus(record.user.id.toString(), { 
+        status: newStatus ? 'active' : 'inactive' 
+      });
       message.success(`Customer ${newStatus ? 'activated' : 'deactivated'} successfully`);
       loadCustomers();
     } catch (error: any) {
@@ -137,6 +143,18 @@ const CustomerManagementPage: React.FC = () => {
     
     return matchesSearch && matchesStatus;
   });
+
+  const handleView = async (record: Customer) => {
+    try {
+      const response = await adminApi.getCustomer(record.id.toString());
+      if (response.data?.success) {
+        setSelectedCustomer(response.data.customer);
+        setViewModalVisible(true);
+      }
+    } catch (error) {
+      message.error('Failed to load customer details');
+    }
+  };
 
   const columns: ColumnsType<Customer> = [
     {
@@ -214,7 +232,7 @@ const CustomerManagementPage: React.FC = () => {
           <Button 
             type="text" 
             icon={<EyeOutlined />} 
-            onClick={() => message.info('View detailed profile coming soon')}
+            onClick={() => handleView(record)}
           >
             View
           </Button>
@@ -263,6 +281,7 @@ const CustomerManagementPage: React.FC = () => {
             <Button 
               icon={<ReloadOutlined />} 
               onClick={loadCustomers}
+              loading={loading}
               style={{ borderRadius: '8px', height: '40px' }}
             >
               Refresh
@@ -326,6 +345,102 @@ const CustomerManagementPage: React.FC = () => {
           className="customer-table"
         />
       </Card>
+
+      <Modal
+        title={<span className="text-base font-bold">Customer Details</span>}
+        open={viewModalVisible}
+        onCancel={() => setViewModalVisible(false)}
+        footer={[
+          <Button key="close" onClick={() => setViewModalVisible(false)}>
+            Close
+          </Button>
+        ]}
+        width={650}
+        centered
+      >
+        {selectedCustomer && (
+          <div className="py-2">
+            <Row gutter={[12, 12]}>
+              {/* Basic Info */}
+              <Col xs={24} sm={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Customer ID</Text><br/>
+                <Text strong>{selectedCustomer.id}</Text>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Status</Text><br/>
+                <Tag color={selectedCustomer.user?.isActive ? 'green' : 'red'}>
+                  {selectedCustomer.user?.isActive ? 'Active' : 'Inactive'}
+                </Tag>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-3 rounded-lg mt-1">
+                  <Text strong className="text-sm">Personal Information</Text>
+                </div>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Full Name</Text><br/>
+                <Text>{selectedCustomer.fullName || selectedCustomer.user?.name || 'N/A'}</Text>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Phone</Text><br/>
+                <Text>{selectedCustomer.user?.phone}</Text>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Email</Text><br/>
+                <Text>{selectedCustomer.user?.email || 'N/A'}</Text>
+              </Col>
+
+              {/* Wallet Info */}
+              <Col span={24}>
+                <div className="bg-blue-50 p-3 rounded-lg mt-2">
+                  <Text strong className="text-sm">Wallet Information</Text>
+                </div>
+              </Col>
+              {selectedCustomer.wallets && selectedCustomer.wallets.length > 0 ? (
+                selectedCustomer.wallets.map((wallet: any, idx: number) => (
+                  <Col xs={24} sm={12} key={idx}>
+                    <Card size="small" className="bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200">
+                      <Text type="secondary" className="text-xs">{wallet.type === 'dashboard_wallet' ? 'Dashboard' : 'Credit'} Wallet</Text><br/>
+                      <Text strong className="text-lg">{wallet.balance?.toLocaleString() || 0} RWF</Text>
+                    </Card>
+                  </Col>
+                ))
+              ) : (
+                <Col span={24}>
+                  <Text type="secondary" className="text-xs">No wallets found</Text>
+                </Col>
+              )}
+
+              {/* NFC Cards */}
+              <Col span={24}>
+                <div className="bg-purple-50 p-3 rounded-lg mt-2">
+                  <Text strong className="text-sm">NFC Cards ({selectedCustomer.nfcCards?.length || 0})</Text>
+                </div>
+              </Col>
+              {selectedCustomer.nfcCards && selectedCustomer.nfcCards.length > 0 ? (
+                selectedCustomer.nfcCards.map((card: any, idx: number) => (
+                  <Col xs={24} sm={12} key={idx}>
+                    <Card size="small" className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200">
+                      <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                        <Text type="secondary" className="text-xs">Card: {card.uid}</Text>
+                        <Text strong className="text-base">{card.balance?.toLocaleString() || 0} RWF</Text>
+                        <Tag color={card.status === 'active' ? 'green' : 'orange'} className="text-xs">
+                          {card.status?.toUpperCase()}
+                        </Tag>
+                      </Space>
+                    </Card>
+                  </Col>
+                ))
+              ) : (
+                <Col span={24}>
+                  <Text type="secondary" className="text-xs">No NFC cards assigned</Text>
+                </Col>
+              )}
+            </Row>
+          </div>
+        )}
+      </Modal>
 
       <style>{`
         .customer-table .ant-table-thead > tr > th {

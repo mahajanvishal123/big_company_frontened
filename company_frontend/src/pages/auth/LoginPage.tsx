@@ -321,7 +321,7 @@ export const LoginPage: React.FC = () => {
 
           {/* Role Selection Tabs */}
           <div className="flex border-b border-gray-200">
-            {(['consumer', 'retailer', 'wholesaler', 'admin'] as PublicUserRole[]).map((role) => (
+            {(['admin', 'consumer', 'retailer', 'wholesaler'] as PublicUserRole[]).map((role) => (
               <button
                 key={role}
                 onClick={() => setActiveRole(role)}

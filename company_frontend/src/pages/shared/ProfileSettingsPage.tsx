@@ -64,16 +64,22 @@ export const ProfileSettingsPage: React.FC = () => {
   const [settingsData, setSettingsData] = useState<any>(null);
 
   const fetchProfile = async () => {
-    if (!isWholesaler) return;
+    if (!isWholesaler && !isRetailer) return;
     setLoading(true);
     try {
-      const response = await wholesalerApi.getProfile();
-      if (response.data.success) {
+      let response;
+      if (isWholesaler) {
+        response = await wholesalerApi.getProfile();
+      } else if (isRetailer) {
+        response = await retailerApi.getProfile();
+      }
+
+      if (response && response.data.success) {
         setProfileData(response.data.profile);
         setSettingsData(response.data.profile.settings);
         profileForm.setFieldsValue({
           name: response.data.profile.user.name,
-          company_name: response.data.profile.companyName,
+          company_name: response.data.profile.companyName || response.data.profile.shop_name,
           phone: response.data.profile.user.phone,
           email: response.data.profile.user.email,
           address: response.data.profile.address,
@@ -103,7 +109,7 @@ export const ProfileSettingsPage: React.FC = () => {
   }, []);
 
   const handleSaveProfile = async (values: any) => {
-    if (!isWholesaler) {
+    if (!isWholesaler && !isRetailer) {
       message.info('Simulation: Profile updated');
       setEditing(false);
       return;
@@ -111,8 +117,14 @@ export const ProfileSettingsPage: React.FC = () => {
 
     setLoading(true);
     try {
-      const response = await wholesalerApi.updateProfile(values);
-      if (response.data.success) {
+      let response;
+      if (isWholesaler) {
+        response = await wholesalerApi.updateProfile(values);
+      } else if (isRetailer) {
+        response = await retailerApi.updateProfile(values);
+      }
+
+      if (response && response.data.success) {
         message.success('Profile updated successfully');
         setProfileData(response.data.profile);
         setEditing(false);
@@ -156,7 +168,7 @@ export const ProfileSettingsPage: React.FC = () => {
   };
 
   const handleNotificationToggle = async (key: string, enabled: boolean) => {
-    if (!isWholesaler) return;
+    if (!isWholesaler) return; // Retailer settings not fully implemented yet
     try {
       await wholesalerApi.updateSettings({ [key]: enabled });
       setSettingsData({ ...settingsData, [key]: enabled });

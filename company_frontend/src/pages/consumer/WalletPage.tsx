@@ -69,7 +69,9 @@ interface NFCCard {
   is_primary: boolean;
   linked_at: string;
   last_used?: string;
+
   nickname?: string;
+  balance?: number; // Add balance
 }
 
 interface CardOrder {
@@ -140,13 +142,21 @@ const ConsumerWalletPage: React.FC = () => {
   const [selectedCard, setSelectedCard] = useState<NFCCard | null>(null);
   const [activeTab, setActiveTab] = useState('transactions');
   const [cardOrdersModalVisible, setCardOrdersModalVisible] = useState(false);
+  const [cardTopUpModalVisible, setCardTopUpModalVisible] = useState(false);
   const [cardOrders, setCardOrders] = useState<{ [key: string]: CardOrder[] }>({});
 
   const [topUpForm] = Form.useForm();
+  const [cardTopUpForm] = Form.useForm();
   const [refundForm] = Form.useForm();
   const [loanForm] = Form.useForm();
   const [linkCardForm] = Form.useForm();
   const [changePinForm] = Form.useForm();
+  
+  // New state for repayment
+  const [repayLoanModalVisible, setRepayLoanModalVisible] = useState(false);
+  const [activeLoanId, setActiveLoanId] = useState<string | null>(null);
+  const [repayAmount, setRepayAmount] = useState<number>(0);
+  const [repayMethod, setRepayMethod] = useState<'dashboard' | 'mobile_money' | 'credit_wallet'>('dashboard');
 
 
 
@@ -204,6 +214,11 @@ const ConsumerWalletPage: React.FC = () => {
       if (loansRes.data.loans) {
         // Transform active loans to credit approvals list for now
         const activeLoans = loansRes.data.loans;
+        const currentActive = activeLoans.find((l: any) => l.status === 'approved' || l.status === 'active');
+        if (currentActive) {
+            setActiveLoanId(currentActive.id);
+        }
+
         setCreditApprovals(activeLoans.map((l: any) => ({
           id: l.id,
           amount_requested: l.amount,
@@ -361,6 +376,29 @@ const ConsumerWalletPage: React.FC = () => {
       loadData();
     } catch (error: any) {
       message.error(error.response?.data?.message || 'Failed to set primary card');
+    }
+  };
+
+  const handleCardTopUp = async (values: any) => {
+    if (!selectedCard) return;
+    try {
+      setLoading(true);
+      const response = await nfcApi.topUpCard(selectedCard.id, {
+        amount: values.amount,
+        pin: values.pin // optional if we require pin
+      });
+
+      if (response.data.success) {
+        message.success(`Successfully added ${values.amount.toLocaleString()} RWF to card!`);
+        setCardTopUpModalVisible(false);
+        cardTopUpForm.resetFields();
+        setSelectedCard(null);
+        await loadData();
+      }
+    } catch (error: any) {
+      message.error(error.response?.data?.error || 'Failed to top up card');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -723,9 +761,37 @@ const ConsumerWalletPage: React.FC = () => {
                                   {card.card_number}
                                 </Title>
                               </div>
-                              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
-                                UID: {card.uid}
-                              </Text>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end', marginTop: 12 }}>
+                                <div>
+                                  <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>Balance</Text>
+                                  <div style={{ color: 'white', fontSize: 18, fontWeight: 'bold' }}>
+                                    {card.balance?.toLocaleString() || 0} RWF
+                                  </div>
+                                </div>
+                                <div style={{ textAlign: 'right' }}>
+                                   <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>UID: {card.uid}</Text>
+                                </div>
+                              </div>
+                              <Button 
+                                type="primary" 
+                                size="small" 
+                                ghost 
+                                style={{ marginTop: 12, width: '100%', borderColor: 'rgba(255,255,255,0.5)', color: 'white' }}
+                                onClick={() => {
+                                  // Open new modal for direct card top-up
+                                  setSelectedCard(card);
+                                  // We can re-use a top-up modal or create a specific one. 
+                                  // For now, let's just trigger the main top-up and maybe auto-fill if we had that logic, 
+                                  // BUT user asked for card data display mostly.
+                                  // Actually, let's create a specific HandleCardTopUp function/modal or reuse existing if simple.
+                                  // Let's reuse the existing Top Up modal but modifying it to support Card Top Up? 
+                                  // Or better, creating a specific lightweight modal for "Card Transfer".
+                                  // Let's create a new state `cardTopUpModalVisible` and use it.
+                                  setCardTopUpModalVisible(true);
+                                }}
+                              >
+                                Top Up Card
+                              </Button>
                             </Space>
                           </Card>
                         </Col>
@@ -943,49 +1009,96 @@ const ConsumerWalletPage: React.FC = () => {
                             danger
                             icon={<DollarOutlined />}
                             onClick={() => {
-                              Modal.confirm({
-                                title: 'Pay Loan',
-                                content: (
-                                  <div>
-                                    <Text>Outstanding Balance: <strong>{creditInfo.outstanding_balance.toLocaleString()} RWF</strong></Text>
-                                    <Divider />
-                                    <Text type="secondary">Select Payment Method:</Text>
-                                    <div style={{ marginTop: 16 }}>
-                                      <Radio.Group defaultValue="dashboard" style={{ width: '100%' }}>
-                                        <Space direction="vertical" style={{ width: '100%' }}>
-                                          <Radio value="dashboard">
-                                            <Space>
-                                              <WalletOutlined style={{ color: '#1890ff' }} />
-                                              <span>Dashboard Balance ({balance?.dashboardBalance?.toLocaleString()} RWF available)</span>
-                                            </Space>
-                                          </Radio>
-                                          <Radio value="mtn">
-                                            <Space>
-                                              <MobileOutlined style={{ color: '#ffcc00' }} />
-                                              <span>MTN Mobile Money</span>
-                                            </Space>
-                                          </Radio>
-                                          <Radio value="airtel">
-                                            <Space>
-                                              <MobileOutlined style={{ color: '#ff0000' }} />
-                                              <span>Airtel Money</span>
-                                            </Space>
-                                          </Radio>
-                                        </Space>
-                                      </Radio.Group>
-                                    </div>
-                                  </div>
-                                ),
-                                okText: 'Pay Now',
-                                cancelText: 'Cancel',
-                                onOk: () => {
-                                  message.success('Loan payment initiated! Check your phone to confirm.');
-                                },
-                              });
+                                // Default to first loan if available, but let user change
+                                const firstLoan = creditApprovals.find(l => l.status === 'approved' || l.status === 'active');
+                                if (firstLoan) {
+                                  setActiveLoanId(firstLoan.id);
+                                  setRepayAmount(firstLoan.amount_requested); // Assuming full repayment for now
+                                  setRepayLoanModalVisible(true);
+                                } else {
+                                  message.info("No active loans to repay");
+                                }
                             }}
                           >
                             Pay Loan
                           </Button>
+                          <Modal
+                              title="Repay Loan"
+                              open={repayLoanModalVisible}
+                              onCancel={() => setRepayLoanModalVisible(false)}
+                              onOk={async () => {
+                                  if (!activeLoanId) return;
+                                  try {
+                                      setLoading(true);
+                                      if (repayMethod === 'dashboard' || repayMethod === 'credit_wallet') {
+                                          await consumerApi.repayLoan(activeLoanId, { 
+                                              amount: repayAmount, 
+                                              payment_method: repayMethod === 'credit_wallet' ? 'credit_wallet' : 'wallet' 
+                                          });
+                                          message.success('Loan repaid successfully!');
+                                          setRepayLoanModalVisible(false);
+                                          loadData(); // Refresh
+                                      } else {
+                                          message.info('Mobile Money integration coming soon');
+                                      }
+                                  } catch (error: any) {
+                                      message.error(error.response?.data?.error || 'Repayment failed');
+                                  } finally {
+                                      setLoading(false);
+                                  }
+                              }}
+                              confirmLoading={loading}
+                              okText="Pay Now"
+                          >
+                              <Space direction="vertical" style={{ width: '100%' }}>
+                                  <Text strong>Select Loan to Repay:</Text>
+                                  <Select 
+                                    style={{ width: '100%' }} 
+                                    value={activeLoanId}
+                                    onChange={(val) => {
+                                        setActiveLoanId(val);
+                                        const loan = creditApprovals.find(l => l.id === val);
+                                        if (loan) setRepayAmount(loan.amount_requested);
+                                    }}
+                                  >
+                                    {creditApprovals.filter(l => l.status === 'approved' || l.status === 'active').map(loan => (
+                                        <Select.Option key={loan.id} value={loan.id}>
+                                            Loan #{loan.id} - {loan.amount_requested.toLocaleString()} RWF
+                                        </Select.Option>
+                                    ))}
+                                  </Select>
+
+                                  <Alert 
+                                      message={`Repaying: ${repayAmount.toLocaleString()} RWF`} 
+                                      type="info" 
+                                      showIcon 
+                                      style={{ marginTop: 12 }}
+                                  />
+                                  <Text strong>Select Payment Method:</Text>
+                                  <Radio.Group value={repayMethod} onChange={e => setRepayMethod(e.target.value)} style={{ width: '100%' }}>
+                                      <Space direction="vertical" style={{ width: '100%' }}>
+                                          <Radio value="dashboard">
+                                              <Space>
+                                                  <WalletOutlined />
+                                                  <span>Dashboard Wallet (Bal: {balance?.dashboardBalance?.toLocaleString()} RWF)</span>
+                                              </Space>
+                                          </Radio>
+                                          <Radio value="credit_wallet">
+                                              <Space>
+                                                  <BankOutlined style={{ color: 'green' }} />
+                                                  <span>Credit Wallet (Unused: {balance?.creditBalance?.toLocaleString()} RWF)</span>
+                                              </Space>
+                                          </Radio>
+                                          <Radio value="mobile_money" disabled>
+                                              <Space>
+                                                  <MobileOutlined />
+                                                  <span>Mobile Money (Coming Soon)</span>
+                                              </Space>
+                                          </Radio>
+                                      </Space>
+                                  </Radio.Group>
+                              </Space>
+                          </Modal>
                         </Col>
                       </Row>
                       <Divider style={{ margin: '12px 0' }} />
@@ -1296,6 +1409,7 @@ const ConsumerWalletPage: React.FC = () => {
         </Form>
       </Modal>
 
+
       {/* Loan Request Modal */}
       <Modal
         title="Request Loan"
@@ -1588,6 +1702,66 @@ const ConsumerWalletPage: React.FC = () => {
               />
             )}
           </div>
+        )}
+
+      </Modal>
+
+      {/* Card Top Up Modal */}
+      <Modal
+        title="Top Up NFC Card"
+        open={cardTopUpModalVisible}
+        onCancel={() => {
+          setCardTopUpModalVisible(false);
+          cardTopUpForm.resetFields();
+          setSelectedCard(null);
+        }}
+        footer={null}
+        width={400}
+      >
+        <Alert 
+          message="Transfer from Available Balance" 
+          description={`Available Balance (Dashboard + Credit): ${balance?.availableBalance?.toLocaleString() || 0} RWF`}
+          type="info" 
+          showIcon 
+          style={{ marginBottom: 16 }}
+        />
+        {selectedCard && (
+
+          <Form
+            form={cardTopUpForm}
+            layout="vertical"
+            onFinish={handleCardTopUp}
+          >
+            <div style={{ marginBottom: 16 }}>
+              <Text strong>Target Card:</Text> <Text code>{selectedCard.uid}</Text>
+            </div>
+            
+            <Form.Item
+              name="amount"
+              label="Amount to Transfer (RWF)"
+              rules={[
+                { required: true },
+                { type: 'number', min: 1, max: balance?.availableBalance || 0, message: `Amount must be between 1 and ${balance?.availableBalance || 0}` }
+              ]}
+            >
+              <InputNumber
+                style={{ width: '100%' }}
+                placeholder="Enter amount"
+                max={balance?.availableBalance || 0}
+                formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button 
+                type="primary" 
+                htmlType="submit" 
+                loading={loading} 
+                block
+              >
+                Transfer Now
+              </Button>
+            </Form.Item>
+          </Form>
         )}
       </Modal>
     </div>

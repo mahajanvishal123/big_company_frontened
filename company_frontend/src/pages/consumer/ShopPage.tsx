@@ -41,7 +41,7 @@ import {
   CheckCircleOutlined,
   LockOutlined,
 } from '@ant-design/icons';
-import { consumerApi } from '../../services/apiService';
+import { consumerApi, nfcApi } from '../../services/apiService';
 import { useCart, Retailer } from '../../contexts/CartContext';
 
 const { Title, Text, Paragraph } = Typography;
@@ -105,7 +105,8 @@ export const ShopPage: React.FC = () => {
   const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(null);
   const [locationForm] = Form.useForm();
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money'>('wallet');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money' | 'nfc_card'>('wallet');
+  const [nfcCards, setNfcCards] = useState<any[]>([]);
   const [checkoutForm] = Form.useForm();
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
@@ -117,13 +118,17 @@ export const ShopPage: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        const [r, c] = await Promise.all([consumerApi.getRetailers(), consumerApi.getCategories()]);
-        setRetailers(r.data.retailers || []);
+        const [c, cardsRes] = await Promise.all([
+          consumerApi.getCategories(),
+          nfcApi.getMyCards()
+        ]);
         setCategories(c.data.categories || []);
+        if (cardsRes.data.success) {
+          setNfcCards(cardsRes.data.data || []);
+        }
       } catch (error) {
         console.error("Error fetching shop data:", error);
-        message.error("Failed to load retailers and categories");
-        setRetailers([]);
+        message.error("Failed to load categories");
         setCategories([]);
       } finally { setLoading(false); }
     };
@@ -158,10 +163,29 @@ export const ShopPage: React.FC = () => {
     });
   }, [products, searchQuery, selectedCategory]);
 
-  const handleLocationSubmit = (v: CustomerLocation) => {
+  const handleLocationSubmit = async (v: CustomerLocation) => {
     setCustomerLocation(v);
-    setShowLocationModal(false);
-    setShowRetailerModal(true);
+    setLoading(true);
+    try {
+      const response = await consumerApi.getRetailers({
+        district: v.district,
+        sector: v.sector,
+        cell: v.cell
+      });
+      setRetailers(response.data.retailers || []);
+      if (response.data.retailers?.length === 0) {
+        message.info("No stores found in this location");
+      } else {
+        message.success(`Found ${response.data.retailers.length} stores nearby`);
+      }
+    } catch (error) {
+      console.error("Error fetching retailers:", error);
+      message.error("Failed to find stores");
+    } finally {
+      setLoading(false);
+      setShowLocationModal(false);
+      setShowRetailerModal(true);
+    }
   };
 
   const handleSelectRetailer = (r: Retailer) => {
@@ -192,7 +216,7 @@ export const ShopPage: React.FC = () => {
     }
   };
 
-  const handlePaymentSubmit = async () => {
+  const handlePaymentSubmit = async (values: any) => {
     if (!selectedRetailer) return;
     setProcessingPayment(true);
     try {
@@ -203,7 +227,8 @@ export const ShopPage: React.FC = () => {
           quantity: item.quantity,
           price: item.price
         })),
-        paymentMethod: paymentMethod, // 'wallet' or otherwise
+        paymentMethod: paymentMethod, 
+        cardId: values.cardId,
         total: cartTotal
       };
 
@@ -359,9 +384,32 @@ export const ShopPage: React.FC = () => {
 
         <Modal open={showCheckoutModal} title="Checkout" onCancel={() => !processingPayment && setShowCheckoutModal(false)} footer={null}>
           {paymentSuccess ? <div style={{ textAlign: 'center', padding: 40 }}><CheckCircleOutlined style={{ fontSize: 64, color: '#10b981' }} /><Title level={3}>Success!</Title></div> : (
-            <Form layout="vertical" onFinish={handlePaymentSubmit}>
+            <Form layout="vertical" onFinish={handlePaymentSubmit} form={checkoutForm}>
               <Card style={{ marginBottom: 24, background: '#f0fdf4', border: 'none' }}><Text type="secondary">Total</Text><Title level={2} style={{ margin: 0, color: '#10b981' }}>{formatPrice(cartTotal)}</Title></Card>
-              <Form.Item label="Payment Method"><Radio.Group value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}><Radio value="wallet">BIG Wallet</Radio><Radio value="mobile_money">Mobile Money</Radio></Radio.Group></Form.Item>
+              <Form.Item label="Payment Method" name="paymentMethod_ignore">
+                <Radio.Group value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+                  <Radio value="wallet">BIG Wallet</Radio>
+                  <Radio value="nfc_card">NFC Card</Radio>
+                  <Radio value="mobile_money">Mobile Money</Radio>
+                </Radio.Group>
+              </Form.Item>
+              
+              {paymentMethod === 'nfc_card' && (
+                <Form.Item 
+                  name="cardId" 
+                  label="Select Card" 
+                  rules={[{ required: true, message: 'Please select a card' }]}
+                >
+                  <Select placeholder="Choose NFC Card">
+                    {nfcCards.map(c => (
+                      <Option key={c.id} value={c.id}>
+                        {c.nickname || c.card_number} (Bal: {c.balance?.toLocaleString() || 0} RWF)
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              )}
+
               <Button type="primary" htmlType="submit" block size="large" loading={processingPayment}>Pay Now</Button>
             </Form>
           )}

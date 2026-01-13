@@ -31,7 +31,8 @@ import {
   PhoneOutlined,
   LockOutlined,
   EnvironmentOutlined,
-  InfoCircleOutlined
+  InfoCircleOutlined,
+  EyeOutlined
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
@@ -41,7 +42,7 @@ const { Option } = Select;
 const { TextArea } = Input;
 
 interface Wholesaler {
-  id: string;
+  id: number;
   business_name: string;
   contact_person: string;
   phone: string;
@@ -55,7 +56,9 @@ const WholesalerManagementPage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [wholesalers, setWholesalers] = useState<Wholesaler[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [selectedWholesaler, setSelectedWholesaler] = useState<any>(null);
   const [form] = Form.useForm();
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -94,7 +97,7 @@ const WholesalerManagementPage: React.FC = () => {
     try {
       setLoading(true);
       if (editingId) {
-        await adminApi.updateWholesaler(editingId, {
+        await adminApi.updateWholesaler(editingId.toString(), {
           company_name: values.business_name,
           email: values.email,
           phone: values.phone,
@@ -133,7 +136,7 @@ const WholesalerManagementPage: React.FC = () => {
     setModalVisible(true);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = (id: number, name: string) => {
     Modal.confirm({
       title: 'Delete Wholesaler Account',
       content: `Are you sure you want to delete the account for ${name}? This will remove their access to the system.`,
@@ -141,7 +144,7 @@ const WholesalerManagementPage: React.FC = () => {
       okType: 'danger',
       onOk: async () => {
         try {
-          await adminApi.deleteWholesaler(id);
+          await adminApi.deleteWholesaler(id.toString());
           message.success('Wholesaler deleted successfully');
           loadWholesalers();
         } catch (error: any) {
@@ -154,11 +157,25 @@ const WholesalerManagementPage: React.FC = () => {
   const handleStatusChange = async (record: Wholesaler) => {
     const newStatus = record.status === 'active' ? false : true;
     try {
-      await adminApi.updateWholesalerStatus(record.id, newStatus);
+      await adminApi.updateWholesalerStatus(record.id.toString(), newStatus);
       message.success(`Account ${newStatus ? 'activated' : 'deactivated'} successfully`);
       loadWholesalers();
     } catch (error: any) {
       message.error('Failed to update status');
+    }
+  };
+
+  const handleView = async (record: Wholesaler) => {
+    try {
+      const response = await adminApi.getWholesaler(record.id.toString());
+      if (response.data?.success) {
+        setSelectedWholesaler(response.data.wholesaler);
+        setViewModalVisible(true);
+      }
+    } catch (error) {
+      // If detailed API fails, use table data
+      setSelectedWholesaler(record);
+      setViewModalVisible(true);
     }
   };
 
@@ -180,7 +197,7 @@ const WholesalerManagementPage: React.FC = () => {
       render: (_, record) => (
         <Space direction="vertical" size={0}>
           <Text strong style={{ color: '#1890ff' }}>{record.business_name}</Text>
-          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id.slice(0, 8)}</Text>
+          <Text type="secondary" style={{ fontSize: '12px' }}>ID: {record.id}</Text>
         </Space>
       ),
     },
@@ -224,6 +241,13 @@ const WholesalerManagementPage: React.FC = () => {
       align: 'right',
       render: (_, record) => (
         <Space>
+          <Tooltip title="View Details">
+            <Button
+              type="text"
+              icon={<EyeOutlined />}
+              onClick={() => handleView(record)}
+            />
+          </Tooltip>
           <Tooltip title="Edit Profile">
             <Button
               type="text"
@@ -423,6 +447,91 @@ const WholesalerManagementPage: React.FC = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Wholesaler Details Modal */}
+      <Modal
+        title={<span className="text-lg font-bold">Wholesaler Details</span>}
+        open={viewModalVisible}
+        onCancel={() => {
+          setViewModalVisible(false);
+          setSelectedWholesaler(null);
+        }}
+        footer={[
+          <Button key="close" onClick={() => {
+            setViewModalVisible(false);
+            setSelectedWholesaler(null);
+          }}>
+            Close
+          </Button>
+        ]}
+        width={800}
+        centered
+      >
+        {selectedWholesaler && (
+          <div className="py-4">
+            <Row gutter={[24, 24]}>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Wholesaler ID</Text><br/>
+                <Text strong className="text-base">{selectedWholesaler.id}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Status</Text><br/>
+                <Tag color={selectedWholesaler.status === 'active' ? 'green' : 'red'}>
+                  {selectedWholesaler.status?.toUpperCase()}
+                </Tag>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <Text strong className="text-sm">Company Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Company Name</Text><br/>
+                <Text strong>{selectedWholesaler.business_name || selectedWholesaler.companyName}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Contact Person</Text><br/>
+                <Text>{selectedWholesaler.contact_person || selectedWholesaler.user?.name || 'N/A'}</Text>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                  <Text strong className="text-sm">Contact Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Phone</Text><br/>
+                <Text>{selectedWholesaler.phone || selectedWholesaler.user?.phone}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Email</Text><br/>
+                <Text>{selectedWholesaler.email || selectedWholesaler.user?.email}</Text>
+              </Col>
+              <Col span={24}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Business Address</Text><br/>
+                <Text>{selectedWholesaler.location || selectedWholesaler.address || 'N/A'}</Text>
+              </Col>
+
+              <Col span={24}>
+                <div className="bg-gray-50 p-4 rounded-lg mt-2">
+                  <Text strong className="text-sm">Account Information</Text>
+                </div>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Created At</Text><br/>
+                <Text>{selectedWholesaler.created_at ? new Date(selectedWholesaler.created_at).toLocaleString() : selectedWholesaler.createdAt ? new Date(selectedWholesaler.createdAt).toLocaleString() : 'N/A'}</Text>
+              </Col>
+              <Col span={12}>
+                <Text type="secondary" className="text-xs uppercase font-semibold">Account Status</Text><br/>
+                <Tag color={selectedWholesaler.user?.isActive ? 'green' : 'red'}>
+                  {selectedWholesaler.user?.isActive ? 'Active' : 'Inactive'}
+                </Tag>
+              </Col>
+            </Row>
+          </div>
+        )}
       </Modal>
 
       <style>{`

@@ -51,7 +51,7 @@ export const employeeApi = {
 // Consumer/Shop APIs
 export const consumerApi = {
   // Retailers
-  getRetailers: (params?: { lat?: number; lng?: number }) =>
+  getRetailers: (params?: { lat?: number; lng?: number; district?: string; sector?: string; cell?: string }) =>
     api.get("/store/retailers", { params }),
 
   // Categories
@@ -393,6 +393,8 @@ export const nfcApi = {
   setPrimaryCard: (cardId: string) => api.put(`/nfc/cards/${cardId}/primary`),
   updateCardNickname: (cardId: string, nickname: string) =>
     api.put(`/nfc/cards/${cardId}/nickname`, { nickname }),
+  topUpCard: (cardId: string, data: { amount: number; pin?: string }) =>
+    api.post(`/nfc/cards/${cardId}/topup`, data),
   getCardOrders: (cardId: string) => api.get(`/nfc/cards/${cardId}/orders`),
 
   // POS NFC operations (for retailers)
@@ -547,6 +549,7 @@ export const adminApi = {
     cell?: string;
     streetAddress?: string;
     landmark?: string;
+    userId?: string;
   }) => api.post("/admin/nfc-cards", data),
   blockNFCCard: (id: string) =>
     api.put(`/admin/nfc-cards/${id}/block`),
