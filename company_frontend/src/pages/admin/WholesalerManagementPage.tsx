@@ -32,8 +32,10 @@ import {
   LockOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
-  EyeOutlined
+  EyeOutlined,
+  FundViewOutlined
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
 
@@ -53,6 +55,7 @@ interface Wholesaler {
 }
 
 const WholesalerManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [wholesalers, setWholesalers] = useState<Wholesaler[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -241,6 +244,17 @@ const WholesalerManagementPage: React.FC = () => {
       align: 'right',
       render: (_, record) => (
         <Space>
+          <Tooltip title="View Real-Time Account (READ-ONLY)">
+            <Button
+              type="primary"
+              ghost
+              size="small"
+              icon={<FundViewOutlined />}
+              onClick={() => navigate(`/admin/account-details/${record.id}?type=wholesaler`)}
+            >
+              Account
+            </Button>
+          </Tooltip>
           <Tooltip title="View Details">
             <Button
               type="text"

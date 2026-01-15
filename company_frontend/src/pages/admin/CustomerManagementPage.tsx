@@ -15,7 +15,9 @@ import {
   Select,
   Statistic,
   Avatar,
-  Tooltip
+  Tooltip,
+  Alert,
+  Divider
 } from 'antd';
 import {
   PlusOutlined,
@@ -33,8 +35,11 @@ import {
   PhoneOutlined,
   MailOutlined,
   TeamOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  LockOutlined,
+  FundViewOutlined
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
 
@@ -57,6 +62,7 @@ interface Customer {
 }
 
 const CustomerManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -76,15 +82,7 @@ const CustomerManagementPage: React.FC = () => {
     try {
       const response = await adminApi.getCustomers();
       if (response.data?.customers) {
-        // Add some mock data for fields shown in design but might not be in API yet
-        const enrichedCustomers = response.data.customers.map((c: any) => ({
-          ...c,
-          id: c.id,
-          gasBalance: (Math.random() * 15).toFixed(2) + " M³",
-          totalSpent: Math.floor(Math.random() * 1000000),
-          orderCount: Math.floor(Math.random() * 50)
-        }));
-        setCustomers(enrichedCustomers);
+        setCustomers(response.data.customers);
       }
     } catch (error: any) {
       console.error('Failed to load customers:', error);
@@ -229,15 +227,25 @@ const CustomerManagementPage: React.FC = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
-          <Button 
-            type="text" 
-            icon={<EyeOutlined />} 
+          <Tooltip title="View Real-Time Account Details (READ-ONLY)">
+            <Button
+              type="primary"
+              ghost
+              icon={<FundViewOutlined />}
+              onClick={() => navigate(`/admin/account-details/${record.id}?type=customer`)}
+            >
+              Account
+            </Button>
+          </Tooltip>
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
             onClick={() => handleView(record)}
           >
-            View
+            Info
           </Button>
-          <Button 
-            type="text" 
+          <Button
+            type="text"
             danger={record.user?.isActive}
             style={{ color: record.user?.isActive ? '#f5222d' : '#1890ff' }}
             icon={record.user?.isActive ? <StopOutlined /> : <CheckCircleOutlined />}
@@ -250,12 +258,15 @@ const CustomerManagementPage: React.FC = () => {
     },
   ];
 
+  const totalOrders = customers.reduce((sum, c) => sum + (c.orderCount || 0), 0);
+  const totalRevenue = customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0);
+
   const stats = [
     { title: 'Total Customers', value: customers.length, icon: <TeamOutlined />, color: '#1890ff', border: '#1890ff' },
     { title: 'Active', value: customers.filter(c => c.user?.isActive).length, icon: <CheckCircleOutlined />, color: '#52c41a', border: '#52c41a' },
-    { title: 'Registered', value: customers.length - 2, icon: <ClockCircleOutlined />, color: '#595959', border: '#595959' }, // Mocking some guest vs registered
-    { title: 'Total Orders', value: 169, icon: <ShoppingOutlined />, color: '#722ed1', border: '#722ed1' },
-    { title: 'Total Revenue', value: '2,815,000 RWF', icon: <DollarOutlined />, color: '#52c41a', border: '#52c41a' }
+    { title: 'Registered', value: customers.length, icon: <ClockCircleOutlined />, color: '#595959', border: '#595959' },
+    { title: 'Total Orders', value: totalOrders, icon: <ShoppingOutlined />, color: '#722ed1', border: '#722ed1' },
+    { title: 'Total Revenue', value: `${totalRevenue.toLocaleString()} RWF`, icon: <DollarOutlined />, color: '#52c41a', border: '#52c41a' }
   ];
 
   return (
@@ -278,14 +289,28 @@ const CustomerManagementPage: React.FC = () => {
             </Space>
           </Col>
           <Col>
-            <Button 
-              icon={<ReloadOutlined />} 
-              onClick={loadCustomers}
-              loading={loading}
-              style={{ borderRadius: '8px', height: '40px' }}
-            >
-              Refresh
-            </Button>
+            <Space>
+              <Button 
+                type="primary"
+                icon={<PlusOutlined />} 
+                onClick={() => {
+                  setEditingId(null);
+                  form.resetFields();
+                  setModalVisible(true);
+                }}
+                style={{ borderRadius: '8px', height: '40px', background: '#fff', color: '#26a69a', borderColor: '#26a69a' }}
+              >
+                Add Customer
+              </Button>
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={loadCustomers}
+                loading={loading}
+                style={{ borderRadius: '8px', height: '40px' }}
+              >
+                Refresh
+              </Button>
+            </Space>
           </Col>
         </Row>
       </Card>
@@ -345,6 +370,120 @@ const CustomerManagementPage: React.FC = () => {
           className="customer-table"
         />
       </Card>
+
+      {/* Professional Customer Creation Modal */}
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <UserOutlined /> {editingId ? 'Edit Customer Profile' : 'Create Customer Account'}
+          </div>
+        }
+        open={modalVisible}
+        onCancel={() => {
+          setModalVisible(false);
+          form.resetFields();
+          setEditingId(null);
+        }}
+        footer={null}
+        width={650}
+        style={{ top: 20 }}
+      >
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={handleSave}
+          requiredMark="optional"
+          style={{ paddingTop: 10 }}
+        >
+          {!editingId && (
+             <Alert
+               message="Customer will receive login credentials via SMS/Email"
+               type="info"
+               showIcon
+               style={{ marginBottom: 24, borderRadius: '8px' }}
+             />
+          )}
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="first_name"
+                label={<Text strong>First Name <Text type="danger">*</Text></Text>}
+                rules={[{ required: true, message: 'Please enter first name' }]}
+              >
+                <Input prefix={<UserOutlined style={{ color: '#bfbfbf' }} />} placeholder="John" size="large" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="last_name"
+                label={<Text strong>Last Name</Text>}
+              >
+                <Input prefix={<UserOutlined style={{ color: '#bfbfbf' }} />} placeholder="Doe" size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="phone"
+                label={<Text strong>Phone Number <Text type="danger">*</Text></Text>}
+                rules={[{ required: true, message: 'Phone number required' }]}
+              >
+                <Input prefix={<PhoneOutlined style={{ color: '#bfbfbf' }} />} placeholder="+250788100001" size="large" />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="email"
+                label={<Text strong>Email Address</Text>}
+                rules={[{ type: 'email', message: 'Please enter valid email' }]}
+              >
+                <Input prefix={<MailOutlined style={{ color: '#bfbfbf' }} />} placeholder="customer@example.com" size="large" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          {!editingId && (
+            <>
+              <Divider style={{ margin: '16px 0' }}>Security Credentials</Divider>
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="password"
+                    label={<Text strong>Initial Password <Text type="danger">*</Text></Text>}
+                    rules={[{ required: true, min: 6, message: 'Minimum 6 characters' }]}
+                  >
+                    <Input.Password prefix={<LockOutlined style={{ color: '#bfbfbf' }} />} placeholder="Temporary password" size="large" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="pin"
+                    label={<Text strong>PIN (Optional)</Text>}
+                  >
+                    <Input prefix={<LockOutlined style={{ color: '#bfbfbf' }} />} placeholder="4-digit PIN" maxLength={4} size="large" />
+                  </Form.Item>
+                </Col>
+              </Row>
+            </>
+          )}
+
+          <Divider style={{ margin: '24px 0 16px' }} />
+
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space size="middle">
+              <Button onClick={() => setModalVisible(false)} size="large" style={{ borderRadius: '6px', minWidth: 100 }}>
+                Cancel
+              </Button>
+              <Button type="primary" htmlType="submit" loading={loading} size="large" style={{ borderRadius: '6px', background: '#26a69a', minWidth: 150 }}>
+                {editingId ? 'Update Profile' : 'Create Account'}
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
+      </Modal>
 
       <Modal
         title={<span className="text-base font-bold">Customer Details</span>}
@@ -435,6 +574,41 @@ const CustomerManagementPage: React.FC = () => {
               ) : (
                 <Col span={24}>
                   <Text type="secondary" className="text-xs">No NFC cards assigned</Text>
+                </Col>
+              )}
+
+              {/* Gas Meters */}
+              <Col span={24}>
+                <div className="bg-orange-50 p-3 rounded-lg mt-2">
+                  <Text strong className="text-sm">Gas Meters ({selectedCustomer.gasMeters?.length || 0})</Text>
+                </div>
+              </Col>
+              {selectedCustomer.gasMeters && selectedCustomer.gasMeters.length > 0 ? (
+                selectedCustomer.gasMeters.map((meter: any, idx: number) => (
+                  <Col xs={24} sm={12} key={idx}>
+                    <Card size="small" className="bg-gradient-to-r from-orange-50 to-orange-100 border-orange-200">
+                      <Space direction="vertical" size={2} style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <Text strong className="text-base">{meter.aliasName || 'No Nickname'}</Text>
+                          <Tag color="orange" className="text-xs">
+                            {meter.meterNumber}
+                          </Tag>
+                        </div>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                          <UserOutlined style={{ marginRight: 4 }} />
+                          Owner: {meter.ownerName}
+                        </Text>
+                        <Text type="secondary" style={{ fontSize: '11px' }}>
+                          <PhoneOutlined style={{ marginRight: 4 }} />
+                          Phone: {meter.ownerPhone}
+                        </Text>
+                      </Space>
+                    </Card>
+                  </Col>
+                ))
+              ) : (
+                <Col span={24}>
+                  <Text type="secondary" className="text-xs">No gas meters registered</Text>
                 </Col>
               )}
             </Row>

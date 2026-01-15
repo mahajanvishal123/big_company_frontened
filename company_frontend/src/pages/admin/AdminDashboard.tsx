@@ -33,6 +33,7 @@ import {
   RiseOutlined,
   FallOutlined,
   ReloadOutlined,
+  FireOutlined,
 } from '@ant-design/icons';
 import {
   LineChart,
@@ -570,6 +571,41 @@ const AdminDashboard: React.FC = () => {
         </Col>
       </Row>
 
+      {/* Gas Section */}
+      <Title level={4} style={{ marginBottom: 16 }}>Gas Service Overview</Title>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic
+              title="Total Gas Purchases"
+              value={stats.gas.totalPurchases}
+              prefix={<ShoppingCartOutlined style={{ color: '#52c41a' }} />}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic
+              title="Total Gas Revenue"
+              value={stats.gas.totalAmount}
+              prefix={<DollarOutlined style={{ color: '#52c41a' }} />}
+              suffix="RWF"
+            />
+          </Card>
+        </Col>
+        <Col xs={24} sm={8}>
+          <Card>
+            <Statistic
+              title="Total Units Distributed"
+              value={stats.gas.totalUnits}
+              prefix={<RiseOutlined style={{ color: '#faad14' }} />}
+              suffix="M³"
+              precision={2}
+            />
+          </Card>
+        </Col>
+      </Row>
+
       {/* Charts Section */}
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {/* Transaction Trend */}
@@ -835,19 +871,21 @@ const AdminDashboard: React.FC = () => {
                       item.entity_type === 'customer' ? <UserOutlined /> :
                         item.entity_type === 'order' ? <ShoppingCartOutlined /> :
                           item.entity_type === 'loan' ? <BankOutlined /> :
-                            <CreditCardOutlined />
+                            item.entity_type === 'gas' ? <FireOutlined /> :
+                              <CreditCardOutlined />
                     }
                     style={{
                       backgroundColor:
                         item.entity_type === 'customer' ? '#1890ff' :
                           item.entity_type === 'order' ? '#52c41a' :
                             item.entity_type === 'loan' ? '#722ed1' :
-                              '#faad14'
+                              item.entity_type === 'gas' ? '#fa8c16' :
+                                '#faad14'
                     }}
                   />
                 }
                 title={item.action.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
-                description={`${item.entity_type} - ${dayjs(item.created_at).fromNow()}`}
+                description={`${item.description} - ${dayjs(item.created_at).fromNow()}`}
               />
             </List.Item>
           )}

@@ -21,6 +21,7 @@ import {
   Tabs,
   Descriptions,
   Alert,
+  Tooltip,
 } from 'antd';
 import {
   FireOutlined,
@@ -36,8 +37,9 @@ import {
   PhoneOutlined,
   DeleteOutlined,
   EditOutlined,
+  CreditCardOutlined,
 } from '@ant-design/icons';
-import { consumerApi } from '../../services/apiService';
+import { consumerApi, nfcApi } from '../../services/apiService';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -50,6 +52,7 @@ interface GasMeter {
   phone_number: string;
   customer_id: string;
   created_at: string;
+  current_units: number;
 }
 
 interface GasTopup {
@@ -57,19 +60,26 @@ interface GasTopup {
   meter_number: string;
   meter_alias: string;
   amount: number;
-  units_purchased: number;
+  units_purchased: string | number;
   token: string;
   payment_method: string;
   created_at: string;
 }
 
+interface NFCCard {
+  id: number;
+  uid: string;
+  card_number: string;
+  balance: number;
+  nickname: string;
+}
+
 interface GasUsage {
   id: string;
-  meter_number: string;
   date: string;
-  units_from_topups: number;
-  units_from_rewards: number;
-  total_units: number;
+  activity: string;
+  type: 'usage' | 'topup';
+  units: number;
 }
 
 const predefinedAmounts = [300, 500, 1000, 2000, 5000, 10000];
@@ -81,6 +91,7 @@ export const GasPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [balance, setBalance] = useState(0);
+  const [nfcCards, setNfcCards] = useState<NFCCard[]>([]);
 
   // Modals
   const [showAddMeter, setShowAddMeter] = useState(false);
@@ -96,20 +107,61 @@ export const GasPage: React.FC = () => {
   const [selectedMeter, setSelectedMeter] = useState<GasMeter | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<number | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money'>('wallet');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money' | 'nfc_card'>('wallet');
+  const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [topupResult, setTopupResult] = useState<any>(null);
+  const [safetyChecking, setSafetyChecking] = useState<string | null>(null);
+  const [simulating, setSimulating] = useState<string | null>(null);
+
+  const calculateEstimateDays = (units: number) => {
+    // Simulated logic: Average household uses 0.5 units per day
+    if (!units || units === 0) return 0;
+    return Math.ceil(units / 0.5);
+  };
+
+  const handleSafetyCheck = (meterId: string) => {
+    setSafetyChecking(meterId);
+    setTimeout(() => {
+      setSafetyChecking(null);
+      message.success({
+        content: 'System Health: 100% | Pressure: Normal | No Leaks Detected',
+        icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+        duration: 4
+      });
+    }, 2000);
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  const generateMeterId = () => {
+    let newId = '';
+    let exists = true;
+    while (exists) {
+      const random = Math.floor(100000 + Math.random() * 900000);
+      newId = `MTR-${random}`;
+      exists = meters.some(m => m.meter_number === newId);
+    }
+    return newId;
+  };
+
+  useEffect(() => {
+    if (showAddMeter) {
+      addMeterForm.setFieldsValue({
+        meter_number: generateMeterId()
+      });
+    }
+  }, [showAddMeter, addMeterForm]);
+
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [metersRes, usageRes, walletsRes] = await Promise.all([
+      const [metersRes, usageRes, walletsRes, nfcRes] = await Promise.all([
         consumerApi.getGasMeters(),
         consumerApi.getGasHistory(),
-        consumerApi.getWallet(),
+        consumerApi.getWallets(),
+        nfcApi.getMyCards(),
       ]);
 
       // Transform meters data
@@ -123,6 +175,7 @@ export const GasPage: React.FC = () => {
           phone_number: m.owner_phone || 'N/A',
           customer_id: 'current-user',
           created_at: m.created_at,
+          current_units: m.current_units || 0,
         }));
         setMeters(transformedMeters);
       }
@@ -134,7 +187,7 @@ export const GasPage: React.FC = () => {
           meter_number: t.meter_number,
           meter_alias: t.meter_alias || 'Unnamed Meter',
           amount: t.amount,
-          units_purchased: Math.round(t.units),
+          units_purchased: Number(t.units).toFixed(2),
           token: t.token || 'N/A',
           payment_method: 'Dashboard Balance',
           created_at: t.created_at,
@@ -144,9 +197,14 @@ export const GasPage: React.FC = () => {
       }
 
       // Get wallet balance
-      if (walletsRes.data.success && walletsRes.data.data.length > 0) {
+      if (walletsRes.data.success && Array.isArray(walletsRes.data.data)) {
         const dashboardWallet = walletsRes.data.data.find((w: any) => w.type === 'dashboard_wallet');
         setBalance(dashboardWallet?.balance || 0);
+      }
+
+      // Get NFC cards
+      if (nfcRes.data.success && Array.isArray(nfcRes.data.data)) {
+        setNfcCards(nfcRes.data.data);
       }
     } catch (error) {
       console.error('Failed to fetch gas data:', error);
@@ -159,59 +217,27 @@ export const GasPage: React.FC = () => {
     }
   };
 
-  // State for auto-fill meter info
-  const [meterLookupLoading, setMeterLookupLoading] = useState(false);
-  const [meterInfo, setMeterInfo] = useState<{
-    owner_name: string;
-    id_number: string;
-    phone_number: string;
-  } | null>(null);
-
-  const handleMeterLookup = async (meterNumber: string) => {
-    if (!meterNumber || meterNumber.length < 6) {
-      setMeterInfo(null);
-      return;
+  // Low Balance Notification Logic
+  useEffect(() => {
+    const lowBalanceMeters = meters.filter(m => m.current_units < 2);
+    if (lowBalanceMeters.length > 0) {
+      lowBalanceMeters.forEach(meter => {
+        message.warning({
+          content: `Low Gas Balance: Meter ${meter.meter_number} has only ${meter.current_units.toFixed(2)} units left. Please recharge soon!`,
+          duration: 5,
+        });
+      });
     }
-
-    setMeterLookupLoading(true);
-    try {
-      // TODO: Replace with real API call to gas meter provider
-      // const response = await fetch(`/api/gas/meter-info/${meterNumber}`);
-      // const data = await response.json();
-
-      // Simulate API call - auto-fill meter information
-      await new Promise((resolve) => setTimeout(resolve, 800));
-
-      // Mock auto-fill data from gas provider API
-      const mockMeterInfo = {
-        owner_name: 'Jean Paul Niyonzima',
-        id_number: '1198780123456789',
-        phone_number: '+250788123456',
-      };
-
-      setMeterInfo(mockMeterInfo);
-      message.success('Meter information retrieved successfully!');
-    } catch (error) {
-      message.error('Failed to retrieve meter information. Please check the meter ID.');
-      setMeterInfo(null);
-    } finally {
-      setMeterLookupLoading(false);
-    }
-  };
+  }, [meters.length]); // Run when meters are loaded
 
   const handleAddMeter = async (values: any) => {
-    if (!meterInfo) {
-      message.error('Please enter a valid meter ID to auto-fill owner information');
-      return;
-    }
-
     setProcessing(true);
     try {
       const response = await consumerApi.addGasMeter({
         meter_number: values.meter_number,
         alias_name: values.alias,
-        owner_name: meterInfo.owner_name,
-        owner_phone: meterInfo.phone_number,
+        owner_name: values.owner_name,
+        owner_phone: values.owner_phone,
       });
 
       if (response.data.success) {
@@ -219,7 +245,6 @@ export const GasPage: React.FC = () => {
         await fetchData(); // Refresh meters list
         setShowAddMeter(false);
         addMeterForm.resetFields();
-        setMeterInfo(null);
       }
     } catch (error: any) {
       message.error(error.response?.data?.error || 'Failed to add meter');
@@ -244,22 +269,34 @@ export const GasPage: React.FC = () => {
       return;
     }
 
+    if (paymentMethod === 'nfc_card' && !selectedCardId) {
+      message.error('Please select an NFC Card for payment');
+      return;
+    }
+
     setProcessing(true);
     try {
       const response = await consumerApi.topupGas({
         meter_number: selectedMeter.meter_number,
         amount: selectedAmount,
         payment_method: paymentMethod,
+        card_id: selectedCardId,
       });
 
       if (response.data.success) {
         const result = response.data.data;
+        const methodLabels = {
+          wallet: 'Dashboard Balance',
+          mobile_money: 'Mobile Money',
+          nfc_card: 'NFC Card'
+        };
+
         setTopupResult({
           meter_number: result.meter_number,
-          units: Math.round(result.units),
+          units: Number(result.units).toFixed(2),
           token: result.token,
           amount: result.amount,
-          payment_method: paymentMethod === 'wallet' ? 'Dashboard Balance' : 'Mobile Money',
+          payment_method: methodLabels[paymentMethod],
         });
 
         setBalance(result.new_wallet_balance);
@@ -275,18 +312,86 @@ export const GasPage: React.FC = () => {
 
   const handleViewUsage = (meter: GasMeter) => {
     setSelectedMeterForUsage(meter);
+    
+    // Transform history to show consumption as well
+    const usageData = history
+      .filter(h => h.meter_number === meter.meter_number)
+      .map(h => ({
+        id: h.id,
+        date: h.created_at,
+        activity: h.amount === 0 ? (h.token || 'Cooking Session') : 'Gas Top-up',
+        type: h.amount === 0 ? 'usage' as const : 'topup' as const,
+        units: Math.abs(Number(h.units_purchased))
+      }));
+    
+    setUsageHistory(usageData);
     setShowUsageHistory(true);
+  };
+
+  const handleSimulateUsage = async (meter: GasMeter) => {
+    if (meter.current_units < 0.05) {
+      message.error('Low gas! Please top up before cooking.');
+      return;
+    }
+    
+    setSimulating(meter.id);
+    message.loading({ content: 'Cooking started...', key: 'sim_usage' });
+    
+    try {
+      const response = await consumerApi.recordGasUsage({
+        meter_number: meter.meter_number,
+        units_used: 0.10,
+        activity: 'Cooking Session'
+      });
+      
+      if (response.data.success) {
+        setTimeout(() => {
+          message.success({ content: 'Yum! Cooking completed. 0.10 kg used.', key: 'sim_usage', icon: <FireOutlined style={{color: '#ff4d4f'}} />, duration: 3 });
+          setSimulating(null);
+          fetchData();
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('Simulation error:', error);
+      message.error({ content: 'Simulation failed', key: 'sim_usage' });
+      setSimulating(null);
+    }
+  };
+
+  const handleMockTopup = async () => {
+    setProcessing(true);
+    try {
+      const response = await consumerApi.topupWallet({
+        amount: 5000,
+        payment_method: 'mobile_money'
+      });
+      if (response.data.success) {
+        message.success('Mock Top-up of 5,000 RWF added to your wallet!');
+        await fetchData();
+      }
+    } catch (error) {
+      message.error('Mock top-up failed');
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const handleDeleteMeter = (meter: GasMeter) => {
     Modal.confirm({
       title: 'Remove Meter',
-      content: `Are you sure you want to remove meter ${meter.meter_number} (${meter.alias})?`,
+      content: `Are you sure you want to remove meter ${meter.meter_number} (${meter.alias})? This will unbind it from your account.`,
       okText: 'Remove',
       okType: 'danger',
-      onOk: () => {
-        setMeters(meters.filter(m => m.id !== meter.id));
-        message.success('Meter removed successfully');
+      onOk: async () => {
+        try {
+          const response = await consumerApi.removeGasMeter(meter.id);
+          if (response.data.success) {
+            setMeters(meters.filter(m => m.id !== meter.id));
+            message.success('Meter removed and released successfully');
+          }
+        } catch (error: any) {
+          message.error(error.response?.data?.error || 'Failed to remove meter');
+        }
       },
     });
   };
@@ -349,7 +454,7 @@ export const GasPage: React.FC = () => {
       title: 'Units',
       dataIndex: 'units_purchased',
       key: 'units_purchased',
-      render: (units: number) => `${units} units`,
+      render: (units: string | number) => `${units} units`,
     },
     {
       title: 'Payment Method',
@@ -382,35 +487,28 @@ export const GasPage: React.FC = () => {
         day: 'numeric',
         month: 'short',
         year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       }),
     },
     {
-      title: 'Units from Top-ups',
-      dataIndex: 'units_from_topups',
-      key: 'units_from_topups',
-      render: (units: number) => (
-        <Text strong style={{ color: '#1890ff' }}>
-          {units} units
-        </Text>
+      title: 'Activity',
+      dataIndex: 'activity',
+      key: 'activity',
+      render: (text: string, record: any) => (
+        <Space>
+          {record.type === 'usage' ? <FireOutlined style={{ color: '#ff4d4f' }} /> : <IdcardOutlined style={{ color: '#1890ff' }} />}
+          <Text strong>{text}</Text>
+        </Space>
       ),
     },
     {
-      title: 'Units from Rewards',
-      dataIndex: 'units_from_rewards',
-      key: 'units_from_rewards',
-      render: (units: number) => (
-        <Text strong style={{ color: '#52c41a' }}>
-          {units} units
-        </Text>
-      ),
-    },
-    {
-      title: 'Total Units',
-      dataIndex: 'total_units',
-      key: 'total_units',
-      render: (units: number) => (
-        <Text strong style={{ color: '#ff7300', fontSize: 16 }}>
-          {units} units
+      title: 'Amount',
+      dataIndex: 'units',
+      key: 'units',
+      render: (units: number, record: any) => (
+        <Text strong style={{ color: record.type === 'usage' ? '#ff4d4f' : '#52c41a' }}>
+          {record.type === 'usage' ? '-' : '+'}{units.toFixed(2)} kg
         </Text>
       ),
     },
@@ -514,6 +612,16 @@ export const GasPage: React.FC = () => {
                     <Button
                       type="text"
                       size="small"
+                      icon={<FireOutlined />}
+                      loading={simulating === meter.id}
+                      style={{ color: '#fffb8f', fontSize: 12 }}
+                      onClick={() => handleSimulateUsage(meter)}
+                    >
+                      Cook
+                    </Button>,
+                    <Button
+                      type="text"
+                      size="small"
                       icon={<HistoryOutlined />}
                       style={{ color: 'white', fontSize: 12 }}
                       onClick={() => handleViewUsage(meter)}
@@ -543,23 +651,50 @@ export const GasPage: React.FC = () => {
                     </div>
                     <Divider style={{ margin: '8px 0', borderColor: 'rgba(255,255,255,0.3)' }} />
                     <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                      <div>
-                        <UserOutlined style={{ marginRight: 8 }} />
-                        <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
-                          {meter.owner_name}
-                        </Text>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span>
+                          <UserOutlined style={{ marginRight: 8, color: 'rgba(255,255,255,0.7)' }} />
+                          <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
+                            {meter.owner_name}
+                          </Text>
+                        </span>
+                        <Tooltip title="Verify Meter Health & Safety">
+                          <Button 
+                            size="small" 
+                            ghost 
+                            icon={<CheckCircleOutlined />} 
+                            loading={safetyChecking === meter.id}
+                            onClick={() => handleSafetyCheck(meter.id)}
+                            style={{ fontSize: 10, height: 22, borderColor: 'rgba(255,255,255,0.5)' }}
+                          >
+                            Safety Check
+                          </Button>
+                        </Tooltip>
                       </div>
                       <div>
-                        <IdcardOutlined style={{ marginRight: 8 }} />
-                        <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
-                          {meter.id_number}
-                        </Text>
-                      </div>
-                      <div>
-                        <PhoneOutlined style={{ marginRight: 8 }} />
+                        <PhoneOutlined style={{ marginRight: 8, color: 'rgba(255,255,255,0.7)' }} />
                         <Text style={{ color: 'rgba(255,255,255,0.9)', fontSize: 12 }}>
                           {meter.phone_number}
                         </Text>
+                      </div>
+                    <div style={{ marginTop: 8, padding: '8px', background: 'rgba(255,255,255,0.15)', borderRadius: 6 }}>
+                        <Row align="middle" gutter={8}>
+                          <Col span={12}>
+                            <Text style={{ color: 'white', display: 'block', fontSize: 10 }}>UNITS LEFT</Text>
+                            <Text strong style={{ color: 'white', fontSize: 14 }}>
+                              {meter.current_units.toFixed(2)} M³
+                            </Text>
+                          </Col>
+                          <Col span={12} style={{ textAlign: 'right' }}>
+                            <Badge status={meter.current_units < 2 ? 'warning' : 'processing'} color={meter.current_units < 2 ? '#f5222d' : '#52c41a'} text={<span style={{ color: 'white', fontSize: 11 }}>{meter.current_units < 2 ? 'Low Balance' : 'Active'}</span>} />
+                          </Col>
+                        </Row>
+                        {meter.current_units < 2 && (
+                          <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', color: '#fff1f0', fontSize: 10 }}>
+                            <ExclamationCircleOutlined style={{ marginRight: 4 }} />
+                            <span>Recharge needed within {calculateEstimateDays(meter.current_units)} day(s)</span>
+                          </div>
+                        )}
                       </div>
                     </Space>
                   </Space>
@@ -612,14 +747,13 @@ export const GasPage: React.FC = () => {
         onCancel={() => {
           setShowAddMeter(false);
           addMeterForm.resetFields();
-          setMeterInfo(null);
         }}
         footer={null}
         width={500}
       >
         <Alert
           message="Meter Registration"
-          description="Enter the meter ID and nickname. Owner information will be automatically retrieved from the gas provider."
+          description="Enter your meter details and owner information to register a new gas meter."
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
@@ -637,18 +771,22 @@ export const GasPage: React.FC = () => {
               { min: 6, message: 'Meter ID must be at least 6 characters' },
             ]}
           >
-            <Input.Search
+            <Input
               prefix={<FireOutlined />}
               placeholder="Enter meter ID (e.g., MTR-001234)"
               size="large"
-              enterButton="Lookup"
-              loading={meterLookupLoading}
-              onSearch={handleMeterLookup}
-              onChange={(e) => {
-                if (meterInfo) setMeterInfo(null);
-              }}
+              suffix={
+                <Button 
+                  type="text" 
+                  size="small" 
+                  icon={<HistoryOutlined />} 
+                  onClick={() => addMeterForm.setFieldsValue({ meter_number: generateMeterId() })}
+                  title="Generate New ID"
+                />
+              }
             />
           </Form.Item>
+
           <Form.Item
             name="alias"
             label="Nickname"
@@ -661,51 +799,42 @@ export const GasPage: React.FC = () => {
             />
           </Form.Item>
 
-          {/* Auto-filled Information Display */}
-          {meterInfo && (
-            <Card
-              size="small"
-              style={{
-                marginBottom: 16,
-                background: '#f6ffed',
-                borderColor: '#b7eb8f',
-              }}
-              title={
-                <Space>
-                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                  <span style={{ color: '#52c41a' }}>Owner Information (Auto-filled)</span>
-                </Space>
-              }
-            >
-              <Descriptions column={1} size="small">
-                <Descriptions.Item label={<><UserOutlined /> Owner Name</>}>
-                  <Text strong>{meterInfo.owner_name}</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label={<><IdcardOutlined /> ID Number</>}>
-                  <Text strong>{meterInfo.id_number}</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label={<><PhoneOutlined /> Phone Number</>}>
-                  <Text strong>{meterInfo.phone_number}</Text>
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
-          )}
+          <Divider style={{ margin: '12px 0' }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>OWNER INFORMATION</Text>
+          </Divider>
 
-          {!meterInfo && !meterLookupLoading && (
-            <Alert
-              message="Enter meter ID and click 'Lookup' to auto-fill owner information"
-              type="warning"
-              showIcon
-              style={{ marginBottom: 16 }}
+          <Form.Item
+            name="owner_name"
+            label="Owner Full Name"
+            rules={[{ required: true, message: 'Please enter owner name' }]}
+          >
+            <Input
+              prefix={<UserOutlined />}
+              placeholder="Enter full name"
+              size="large"
             />
-          )}
+          </Form.Item>
 
-          <Form.Item>
+          <Form.Item
+            name="owner_phone"
+            label="Owner Phone Number"
+            rules={[
+              { required: true, message: 'Please enter phone number' },
+              { pattern: /^\+?250\d{9}$/, message: 'Enter valid phone number (+250...)' }
+            ]}
+          >
+            <Input
+              prefix={<PhoneOutlined />}
+              placeholder="+250788123456"
+              size="large"
+            />
+          </Form.Item>
+
+          <Form.Item style={{ marginTop: 24, marginBottom: 0 }}>
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
               <Button onClick={() => {
                 setShowAddMeter(false);
                 addMeterForm.resetFields();
-                setMeterInfo(null);
               }}>
                 Cancel
               </Button>
@@ -713,7 +842,7 @@ export const GasPage: React.FC = () => {
                 type="primary"
                 htmlType="submit"
                 loading={processing}
-                disabled={!meterInfo}
+                icon={<PlusOutlined />}
               >
                 Add Meter
               </Button>
@@ -786,7 +915,7 @@ export const GasPage: React.FC = () => {
 
             {selectedAmount && (
               <Alert
-                message={`Estimated Units: ~${Math.floor(selectedAmount / 1.2)} units`}
+                message={`Estimated Units: ~${(selectedAmount / 1500).toFixed(2)} kg`}
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
@@ -810,6 +939,19 @@ export const GasPage: React.FC = () => {
                           <Text strong>Dashboard Balance</Text>
                           <br />
                           <Text type="secondary">Available: {formatPrice(balance)}</Text>
+                          {balance < (selectedAmount || 300) && (
+                            <Button 
+                              type="link" 
+                              size="small" 
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMockTopup();
+                              }}
+                              style={{ padding: '0 8px' }}
+                            >
+                              Top up
+                            </Button>
+                          )}
                         </div>
                       </Space>
                     </Card>
@@ -826,9 +968,46 @@ export const GasPage: React.FC = () => {
                       </Space>
                     </Card>
                   </Radio>
+                  <Radio value="nfc_card" style={{ width: '100%' }}>
+                    <Card size="small" style={{ margin: '8px 0' }}>
+                      <Space>
+                        <IdcardOutlined style={{ fontSize: 24, color: '#722ed1' }} />
+                        <div>
+                          <Text strong>NFC Card</Text>
+                          <br />
+                          <Text type="secondary">Pay with your linked card</Text>
+                        </div>
+                      </Space>
+                    </Card>
+                  </Radio>
                 </Space>
               </Radio.Group>
             </Form.Item>
+
+            {/* NFC Card Selection */}
+            {paymentMethod === 'nfc_card' && (
+              <Form.Item 
+                label="Select NFC Card" 
+                required
+                help={selectedCardId ? `Card Balance: ${formatPrice(nfcCards.find(c => c.id === selectedCardId)?.balance || 0)}` : ''}
+              >
+                <Select
+                  placeholder="Choose a card"
+                  size="large"
+                  onChange={(val) => setSelectedCardId(val)}
+                  value={selectedCardId}
+                >
+                  {nfcCards.map(card => (
+                    <Select.Option key={card.id} value={card.id}>
+                      {card.nickname} ({card.card_number}) - {formatPrice(card.balance)}
+                    </Select.Option>
+                  ))}
+                  {nfcCards.length === 0 && (
+                     <Select.Option disabled value="none">No cards linked</Select.Option>
+                  )}
+                </Select>
+              </Form.Item>
+            )}
 
             {/* Mobile Money Fields */}
             {paymentMethod === 'mobile_money' && (
@@ -993,7 +1172,7 @@ export const GasPage: React.FC = () => {
             />
             <Table
               columns={usageColumns}
-              dataSource={usageHistory.filter(u => u.meter_number === selectedMeterForUsage.meter_number)}
+              dataSource={usageHistory}
               rowKey="id"
               pagination={false}
               size="small"

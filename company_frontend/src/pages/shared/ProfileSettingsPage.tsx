@@ -37,6 +37,8 @@ import {
   PrinterOutlined,
   GlobalOutlined,
   ApiOutlined,
+  BankOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
 import { retailerApi } from '../../services/apiService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -376,6 +378,68 @@ export const ProfileSettingsPage: React.FC = () => {
                   </Button>
                 </Space>
               </Card>
+
+              {/* Linked Wholesaler Card - Only for Retailers */}
+              {isRetailer && (
+                <Card
+                  title={<><LinkOutlined /> My Wholesaler</>}
+                  style={{ marginTop: 16 }}
+                  styles={{ body: { padding: profileData?.linkedWholesaler ? 16 : 24 } }}
+                >
+                  {profileData?.linkedWholesaler ? (
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                        <Avatar
+                          size={48}
+                          icon={<BankOutlined />}
+                          style={{ backgroundColor: '#722ed1', marginRight: 12 }}
+                        />
+                        <div>
+                          <Text strong style={{ fontSize: 16, display: 'block' }}>
+                            {profileData.linkedWholesaler.companyName}
+                          </Text>
+                          <Tag color="purple">Wholesaler</Tag>
+                        </div>
+                      </div>
+                      <Divider style={{ margin: '12px 0' }} />
+                      <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                        {profileData.linkedWholesaler.contactPerson && (
+                          <Text type="secondary">
+                            <UserOutlined style={{ marginRight: 8 }} />
+                            {profileData.linkedWholesaler.contactPerson}
+                          </Text>
+                        )}
+                        {profileData.linkedWholesaler.phone && (
+                          <Text type="secondary">
+                            <PhoneOutlined style={{ marginRight: 8 }} />
+                            {profileData.linkedWholesaler.phone}
+                          </Text>
+                        )}
+                        {profileData.linkedWholesaler.email && (
+                          <Text type="secondary">
+                            <MailOutlined style={{ marginRight: 8 }} />
+                            {profileData.linkedWholesaler.email}
+                          </Text>
+                        )}
+                        {profileData.linkedWholesaler.address && (
+                          <Text type="secondary">
+                            <HomeOutlined style={{ marginRight: 8 }} />
+                            {profileData.linkedWholesaler.address}
+                          </Text>
+                        )}
+                      </Space>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', color: '#999' }}>
+                      <BankOutlined style={{ fontSize: 32, marginBottom: 8 }} />
+                      <div>No wholesaler linked yet</div>
+                      <Text type="secondary" style={{ fontSize: 12 }}>
+                        Place your first order to get linked
+                      </Text>
+                    </div>
+                  )}
+                </Card>
+              )}
             </Col>
           </Row>
         </TabPane>

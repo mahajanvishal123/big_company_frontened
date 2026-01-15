@@ -19,6 +19,7 @@ import {
   Statistic,
   Divider,
   Empty,
+  Tooltip,
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -31,7 +32,10 @@ import {
   DollarOutlined,
   InboxOutlined,
   TruckOutlined,
+  LockOutlined,
+  LinkOutlined,
 } from '@ant-design/icons';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Title, Text } = Typography;
@@ -57,6 +61,10 @@ import { retailerApi } from '../../services/apiService';
 // ... (imports remain)
 
 const AddStockPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const urlWholesalerId = searchParams.get('wholesalerId');
+
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<WholesalerProduct[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -65,18 +73,32 @@ const AddStockPage: React.FC = () => {
   const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
   const [capitalWalletBalance, setCapitalWalletBalance] = useState(0);
 
+  // NEW: Track if user can buy (linked to this wholesaler)
+  const [canBuy, setCanBuy] = useState(false);
+  const [isLinked, setIsLinked] = useState(false);
+  const [viewingWholesalerInfo, setViewingWholesalerInfo] = useState<{id: number, companyName: string, address: string} | null>(null);
+
   // Load wholesaler products and wallet balance
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [urlWholesalerId]);
 
   const fetchData = async () => {
     setLoading(true);
-    
-    // 1. Fetch Wholesaler Products
+
+    // 1. Fetch Wholesaler Products (with optional wholesalerId from URL)
     try {
-      const productsRes = await retailerApi.getWholesalerProducts({ limit: 100 });
+      const params: any = { limit: 100 };
+      if (urlWholesalerId) {
+        params.wholesalerId = urlWholesalerId;
+      }
+      const productsRes = await retailerApi.getWholesalerProducts(params);
       setProducts(productsRes.data?.products || []);
+      setCanBuy(productsRes.data?.canBuy || false);
+      setIsLinked(productsRes.data?.isLinked || false);
+      if (productsRes.data?.wholesalerInfo) {
+        setViewingWholesalerInfo(productsRes.data.wholesalerInfo);
+      }
     } catch (error: any) {
       console.error('Failed to load wholesaler products:', error);
       message.error(`Failed to load wholesaler products: ${error.response?.data?.error || error.message}`);
@@ -88,8 +110,6 @@ const AddStockPage: React.FC = () => {
       setCapitalWalletBalance(walletRes.data?.capital_wallet_balance || walletRes.data?.balance || 0);
     } catch (error: any) {
       console.error('Failed to load wallet:', error);
-      // Optional: don't show error to user if just wallet fails, or show a different one
-      // message.error('Failed to load wallet balance'); 
     }
 
     setLoading(false);
@@ -104,6 +124,12 @@ const AddStockPage: React.FC = () => {
   });
 
   const addToCart = (product: WholesalerProduct) => {
+    // Block if not allowed to buy
+    if (!canBuy) {
+      message.warning('You must be linked to this wholesaler to add items to cart. Send a link request first.');
+      return;
+    }
+
     const existingItem = cart.find(item => item.product.id === product.id);
     if (existingItem) {
       setCart(cart.map(item =>
@@ -220,6 +246,18 @@ const AddStockPage: React.FC = () => {
       key: 'action',
       render: (_, record) => {
         const inCart = cart.find(item => item.product.id === record.id);
+
+        // If can't buy, show disabled button with tooltip
+        if (!canBuy) {
+          return (
+            <Tooltip title="Link with this wholesaler to order">
+              <Button icon={<LockOutlined />} size="small" disabled>
+                Locked
+              </Button>
+            </Tooltip>
+          );
+        }
+
         return inCart ? (
           <Space>
             <Button
@@ -257,12 +295,19 @@ const AddStockPage: React.FC = () => {
         <Col flex="auto">
           <Title level={3} style={{ margin: 0 }}>
             <ShopOutlined style={{ marginRight: 12 }} />
-            Add Stock from Wholesaler
+            {canBuy ? 'Add Stock from Wholesaler' : 'View Wholesaler Products'}
           </Title>
-          <Text type="secondary">View and order products from your assigned wholesaler</Text>
+          <Text type="secondary">
+            {canBuy ? 'View and order products from your linked wholesaler' : 'Browsing products (Read-Only Mode)'}
+          </Text>
         </Col>
         <Col>
           <Space>
+            {urlWholesalerId && (
+              <Button onClick={() => navigate('/retailer/wholesalers')}>
+                Back to Wholesalers
+              </Button>
+            )}
             <Statistic
               title="Capital Wallet"
               value={capitalWalletBalance}
@@ -274,9 +319,33 @@ const AddStockPage: React.FC = () => {
         </Col>
       </Row>
 
-      {/* Assigned Wholesaler Info */}
+      {/* Read-Only Banner for unlinked wholesalers */}
+      {!canBuy && urlWholesalerId && (
+        <Alert
+          message={<Text strong><LockOutlined /> Read-Only Mode</Text>}
+          description={
+            <Space direction="vertical">
+              <Text>You are viewing {viewingWholesalerInfo?.companyName || 'this wholesaler'}'s products. To place orders, you must first link with this wholesaler.</Text>
+              <Button type="primary" size="small" icon={<LinkOutlined />} onClick={() => navigate('/retailer/wholesalers')}>
+                Go to Link Wholesalers
+              </Button>
+            </Space>
+          }
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {/* Wholesaler Info */}
       <Card
-        style={{ marginBottom: 24, background: 'linear-gradient(135deg, #722ed1 0%, #9254de 100%)', border: 'none' }}
+        style={{
+          marginBottom: 24,
+          background: canBuy
+            ? 'linear-gradient(135deg, #722ed1 0%, #9254de 100%)'
+            : 'linear-gradient(135deg, #faad14 0%, #ffc53d 100%)',
+          border: 'none'
+        }}
         bodyStyle={{ padding: '16px 24px' }}
       >
         <Row justify="space-between" align="middle">
@@ -284,26 +353,39 @@ const AddStockPage: React.FC = () => {
             <Space>
               <TruckOutlined style={{ fontSize: 24, color: 'white' }} />
               <div>
-                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>YOUR ASSIGNED WHOLESALER</Text>
-                <Title level={4} style={{ margin: 0, color: 'white' }}>BIG Company Wholesale</Title>
+                <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12 }}>
+                  {canBuy ? 'YOUR LINKED WHOLESALER' : 'VIEWING WHOLESALER'}
+                </Text>
+                <Title level={4} style={{ margin: 0, color: 'white' }}>
+                  {viewingWholesalerInfo?.companyName || 'Wholesaler'}
+                </Title>
               </div>
             </Space>
           </Col>
           <Col>
-            <Tag color="green" style={{ fontSize: 14, padding: '4px 12px' }}>
-              <CheckCircleOutlined /> Real-time Stock
-            </Tag>
+            {canBuy ? (
+              <Tag color="green" style={{ fontSize: 14, padding: '4px 12px' }}>
+                <CheckCircleOutlined /> Linked - Can Order
+              </Tag>
+            ) : (
+              <Tag color="orange" style={{ fontSize: 14, padding: '4px 12px' }}>
+                <LockOutlined /> Not Linked - View Only
+              </Tag>
+            )}
           </Col>
         </Row>
       </Card>
-      <Alert
-        message="Capital Wallet Payment Only"
-        description="All orders from your assigned wholesaler are paid exclusively from your Capital Wallet balance. No other payment methods accepted."
-        type="warning"
-        showIcon
-        icon={<DollarOutlined />}
-        style={{ marginBottom: 24 }}
-      />
+
+      {canBuy && (
+        <Alert
+          message="Capital Wallet Payment Only"
+          description="All orders from your linked wholesaler are paid exclusively from your Capital Wallet balance. No other payment methods accepted."
+          type="info"
+          showIcon
+          icon={<DollarOutlined />}
+          style={{ marginBottom: 24 }}
+        />
+      )}
 
       <Row gutter={16}>
         {/* Product List */}

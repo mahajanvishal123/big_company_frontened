@@ -15,12 +15,14 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/auth/LoginPage';
 import { ShopPage } from './pages/consumer/ShopPage';
 import { OrdersPage as ConsumerOrdersPage } from './pages/consumer/OrdersPage';
+import { RetailersPage as ConsumerRetailersPage } from './pages/consumer/RetailersPage';
 import ConsumerWalletPage from './pages/consumer/WalletPage';
 import ConsumerProfilePage from './pages/consumer/ProfilePage';
 import GasPage from './pages/consumer/GasPage';
 import RewardsPage from './pages/consumer/RewardsPage';
 import CreditLedgerPage from './pages/consumer/CreditLedgerPage';
 import CreditTransactionsPage from './pages/consumer/CreditTransactionsPage';
+import RetailerDiscoveryPage from './pages/consumer/RetailerDiscoveryPage';
 
 // Employee Pages
 
@@ -34,6 +36,8 @@ import { WalletPage } from './pages/retailer/WalletPage';
 import AddStockPage from './pages/retailer/AddStockPage';
 import ManagementPage from './pages/retailer/ManagementPage';
 import RetailerAnalyticsPage from './pages/retailer/AnalyticsPage';
+import WholesalerDiscoveryPage from './pages/retailer/WholesalerDiscoveryPage';
+import CustomerLinkRequestsPage from './pages/retailer/CustomerLinkRequestsPage';
 
 // Wholesaler Pages
 import { WholesalerDashboard } from './pages/wholesaler/WholesalerDashboard';
@@ -43,6 +47,7 @@ import RetailersPage from './pages/wholesaler/RetailersPage';
 import WholesalerAnalyticsPage from './pages/wholesaler/AnalyticsPage';
 import WalletCreditPage from './pages/wholesaler/WalletCreditPage';
 import MyManagementPage from './pages/wholesaler/MyManagementPage';
+import LinkRequestsPage from './pages/wholesaler/LinkRequestsPage';
 import ProfileSettingsPage from './pages/shared/ProfileSettingsPage';
 
 // Admin Pages
@@ -64,6 +69,10 @@ import RecruitmentPage from './pages/admin/RecruitmentPage';
 import VendorManagementPage from './pages/admin/VendorManagementPage';
 import DealsPage from './pages/admin/DealsPage';
 import PricingConfigPage from './pages/admin/PricingConfigPage';
+// New Admin Pages for Client Requirements
+import SettlementInvoicesPage from './pages/admin/SettlementInvoicesPage';
+import AccountDetailsPage from './pages/admin/AccountDetailsPage';
+import LinkageManagementPage from './pages/admin/LinkageManagementPage';
 
 // Placeholder for pages not yet implemented
 const PlaceholderPage: React.FC<{ title: string }> = ({ title }) => (
@@ -102,7 +111,9 @@ function App() {
                 </ProtectedRoute>
               }
             >
-              <Route index element={<Navigate to="/consumer/shop" replace />} />
+              <Route index element={<Navigate to="/consumer/discover-retailers" replace />} />
+              <Route path="discover-retailers" element={<RetailerDiscoveryPage />} />
+              <Route path="retailers" element={<ConsumerRetailersPage />} />
               <Route path="shop" element={<ShopPage />} />
               <Route path="orders" element={<ConsumerOrdersPage />} />
               <Route path="wallet" element={<ConsumerWalletPage />} />
@@ -143,6 +154,8 @@ function App() {
               <Route path="wallet" element={<WalletPage />} />
               <Route path="management" element={<ManagementPage />} />
               <Route path="analytics" element={<RetailerAnalyticsPage />} />
+              <Route path="wholesalers" element={<WholesalerDiscoveryPage />} />
+              <Route path="customer-requests" element={<CustomerLinkRequestsPage />} />
               <Route path="profile" element={<ProfileSettingsPage />} />
             </Route>
 
@@ -160,6 +173,7 @@ function App() {
               <Route path="inventory" element={<WholesalerInventoryPage />} />
               <Route path="orders" element={<WholesalerOrdersPage />} />
               <Route path="retailers" element={<RetailersPage />} />
+              <Route path="link-requests" element={<LinkRequestsPage />} />
               <Route path="wallet" element={<WalletCreditPage />} />
               <Route path="management" element={<MyManagementPage />} />
               <Route path="analytics" element={<WholesalerAnalyticsPage />} />
@@ -186,6 +200,17 @@ function App() {
               <Route path="pricing-config" element={<PricingConfigPage />} />
               <Route path="reports" element={<ReportsPage />} />
               <Route path="profile" element={<ProfileSettingsPage />} />
+              {/* New routes for client requirements */}
+              <Route path="settlement-invoices" element={<SettlementInvoicesPage />} />
+              <Route path="account-details/:id" element={<AccountDetailsPage />} />
+              <Route path="linkage" element={<LinkageManagementPage />} />
+              {/* HR Routes */}
+              <Route path="employees" element={<EmployeeManagementPage />} />
+              <Route path="employees/:id" element={<EmployeeDetailsPage />} />
+              <Route path="payroll" element={<PayrollProcessingPage />} />
+              <Route path="recruitment" element={<RecruitmentPage />} />
+              <Route path="vendors" element={<VendorManagementPage />} />
+              <Route path="deals" element={<DealsPage />} />
             </Route>
 
             {/* Catch all - redirect to home */}

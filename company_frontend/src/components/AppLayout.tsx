@@ -38,6 +38,7 @@ const { Text } = Typography;
 // Menu items per role
 const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: string; path: string; mobileLabel?: string }[]> = {
   consumer: [
+    { key: 'discover-retailers', icon: <ShopOutlined />, label: 'Find & Link Retailer', path: '/consumer/discover-retailers', mobileLabel: 'Link' },
     { key: 'shop', icon: <ShoppingCartOutlined />, label: 'Shop', path: '/consumer/shop', mobileLabel: 'Shop' },
     { key: 'orders', icon: <InboxOutlined />, label: 'My Orders', path: '/consumer/orders', mobileLabel: 'My Orders' },
     { key: 'wallet', icon: <CreditCardOutlined />, label: 'Wallet & Cards', path: '/consumer/wallet', mobileLabel: 'Wallet' },
@@ -52,6 +53,8 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
     { key: 'add-stock', icon: <ShoppingCartOutlined />, label: 'Add Stock', path: '/retailer/add-stock', mobileLabel: 'Add Stock' },
     { key: 'inventory', icon: <InboxOutlined />, label: 'Inventory', path: '/retailer/inventory', mobileLabel: 'Stock' },
     { key: 'orders', icon: <ShoppingCartOutlined />, label: 'Orders', path: '/retailer/orders', mobileLabel: 'Orders' },
+    { key: 'customer-requests', icon: <UserAddOutlined />, label: 'Customer Requests', path: '/retailer/customer-requests', mobileLabel: 'Customers' },
+    { key: 'wholesalers', icon: <TeamOutlined />, label: 'Find Wholesaler', path: '/retailer/wholesalers', mobileLabel: 'Wholesalers' },
     { key: 'wallet', icon: <DollarOutlined />, label: 'Wallet & Credit', path: '/retailer/wallet', mobileLabel: 'Wallet' },
     { key: 'management', icon: <CreditCardOutlined />, label: 'My Management', path: '/retailer/management', mobileLabel: 'Manage' },
     { key: 'analytics', icon: <BarChartOutlined />, label: 'Analytics', path: '/retailer/analytics', mobileLabel: 'Stats' },
@@ -62,6 +65,7 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
     { key: 'inventory', icon: <InboxOutlined />, label: 'Inventory', path: '/wholesaler/inventory', mobileLabel: 'Stock' },
     { key: 'orders', icon: <ShoppingCartOutlined />, label: 'Retailer Orders', path: '/wholesaler/orders', mobileLabel: 'Orders' },
     { key: 'retailers', icon: <TeamOutlined />, label: 'My Retailers', path: '/wholesaler/retailers', mobileLabel: 'Retailers' },
+    { key: 'link-requests', icon: <UserAddOutlined />, label: 'Link Requests', path: '/wholesaler/link-requests', mobileLabel: 'Requests' },
     { key: 'wallet', icon: <CreditCardOutlined />, label: 'Wallet & Credit', path: '/wholesaler/wallet', mobileLabel: 'Wallet' },
     { key: 'management', icon: <ShopOutlined />, label: 'My Management', path: '/wholesaler/management', mobileLabel: 'Manage' },
     { key: 'analytics', icon: <BarChartOutlined />, label: 'Analytics', path: '/wholesaler/analytics', mobileLabel: 'Stats' },
@@ -86,9 +90,9 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
 // Mobile bottom nav items (limited to 5 most important items per role)
 // NOTE: Consumer has 'orders' instead of 'rewards' as per requirement
 const mobileBottomNavItems: Record<UserRole, string[]> = {
-  consumer: ['shop', 'orders', 'wallet', 'gas', 'profile'],
+  consumer: ['discover-retailers', 'shop', 'orders', 'wallet', 'profile'],
   employee: ['attendance', 'projects', 'payslips', 'profile'],
-  retailer: ['dashboard', 'pos', 'orders', 'wallet', 'management'],
+  retailer: ['dashboard', 'pos', 'customer-requests', 'orders', 'wallet'],
   wholesaler: ['dashboard', 'orders', 'retailers', 'wallet', 'management'],
   admin: ['dashboard', 'employees', 'payroll', 'accounts', 'customers'],
 };

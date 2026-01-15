@@ -27,6 +27,9 @@ import {
   LockOutlined,
   CreditCardOutlined,
   HistoryOutlined,
+  ShopOutlined,
+  LinkOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config';
@@ -405,6 +408,65 @@ export const ProfilePage: React.FC = () => {
                 Logout from All Devices
               </Button>
             </Space>
+          </Card>
+
+          {/* My Retailer - Last purchased from */}
+          <Card
+            title={<><LinkOutlined /> My Retailer</>}
+            style={{ marginTop: 24 }}
+          >
+            {profileData?.linkedRetailer ? (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                  <Avatar
+                    size={48}
+                    icon={<ShopOutlined />}
+                    style={{ backgroundColor: '#1890ff', marginRight: 12 }}
+                  />
+                  <div>
+                    <Text strong style={{ fontSize: 16, display: 'block' }}>
+                      {profileData.linkedRetailer.shopName}
+                    </Text>
+                    <Tag color="blue">Retailer</Tag>
+                  </div>
+                </div>
+                <Divider style={{ margin: '12px 0' }} />
+                <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                  {profileData.linkedRetailer.phone && (
+                    <Text type="secondary">
+                      <PhoneOutlined style={{ marginRight: 8 }} />
+                      {profileData.linkedRetailer.phone}
+                    </Text>
+                  )}
+                  {profileData.linkedRetailer.email && (
+                    <Text type="secondary">
+                      <MailOutlined style={{ marginRight: 8 }} />
+                      {profileData.linkedRetailer.email}
+                    </Text>
+                  )}
+                  {profileData.linkedRetailer.address && (
+                    <Text type="secondary">
+                      <HomeOutlined style={{ marginRight: 8 }} />
+                      {profileData.linkedRetailer.address}
+                    </Text>
+                  )}
+                  {profileData.linkedRetailer.lastPurchaseDate && (
+                    <Text type="secondary" style={{ marginTop: 8 }}>
+                      <CalendarOutlined style={{ marginRight: 8 }} />
+                      Last purchase: {new Date(profileData.linkedRetailer.lastPurchaseDate).toLocaleDateString()}
+                    </Text>
+                  )}
+                </Space>
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', color: '#999', padding: '16px 0' }}>
+                <ShopOutlined style={{ fontSize: 32, marginBottom: 8 }} />
+                <div>No retailer linked yet</div>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  Make your first purchase to link
+                </Text>
+              </div>
+            )}
           </Card>
 
           {/* Recent Activity */}

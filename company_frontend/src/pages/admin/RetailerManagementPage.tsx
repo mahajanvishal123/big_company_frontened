@@ -33,8 +33,10 @@ import {
   LockOutlined,
   EnvironmentOutlined,
   InfoCircleOutlined,
-  EyeOutlined
+  EyeOutlined,
+  FundViewOutlined
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
 
@@ -56,6 +58,7 @@ interface Retailer {
 }
 
 const RetailerManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<Retailer[]>([]);
   const [modalVisible, setModalVisible] = useState(false);
@@ -251,6 +254,17 @@ const RetailerManagementPage: React.FC = () => {
       align: 'right',
       render: (_, record) => (
         <Space>
+          <Tooltip title="View Real-Time Account (READ-ONLY)">
+            <Button
+              type="primary"
+              ghost
+              size="small"
+              icon={<FundViewOutlined />}
+              onClick={() => navigate(`/admin/account-details/${record.id}?type=retailer`)}
+            >
+              Account
+            </Button>
+          </Tooltip>
           <Tooltip title="View Details">
             <Button
               type="text"

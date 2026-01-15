@@ -22,6 +22,7 @@ import {
   Radio,
   Avatar,
   ConfigProvider,
+  Tooltip,
 } from 'antd';
 import {
   ShoppingCartOutlined,
@@ -40,7 +41,10 @@ import {
   PhoneOutlined,
   CheckCircleOutlined,
   LockOutlined,
+  DeleteOutlined,
+  SendOutlined,
 } from '@ant-design/icons';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { consumerApi, nfcApi } from '../../services/apiService';
 import { useCart, Retailer } from '../../contexts/CartContext';
 
@@ -79,6 +83,10 @@ interface CustomerLocation {
 
 export const ShopPage: React.FC = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const urlRetailerId = searchParams.get('retailerId');
+
   const {
     items: cartItems,
     selectedRetailer,
@@ -89,6 +97,7 @@ export const ShopPage: React.FC = () => {
     clearCart,
     selectRetailer,
     getItemQuantity,
+    removeItem,
   } = useCart();
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -101,8 +110,22 @@ export const ShopPage: React.FC = () => {
   const [showRetailerModal, setShowRetailerModal] = useState(false);
   const [showCartDrawer, setShowCartDrawer] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [showLocationModal, setShowLocationModal] = useState(true);
-  const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(null);
+
+  // NEW: Track if user can buy (linked to this retailer)
+  const [canBuy, setCanBuy] = useState(false);
+  const [isLinked, setIsLinked] = useState(false);
+  const [viewingRetailerInfo, setViewingRetailerInfo] = useState<{id: number, shopName: string, address: string} | null>(null);
+
+  const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(() => {
+    try {
+      const saved = localStorage.getItem('bigcompany_location');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [showLocationModal, setShowLocationModal] = useState(!customerLocation);
   const [locationForm] = Form.useForm();
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money' | 'nfc_card'>('wallet');
@@ -118,36 +141,77 @@ export const ShopPage: React.FC = () => {
   useEffect(() => {
     const init = async () => {
       try {
-        const [c, cardsRes] = await Promise.all([
+        const [c, profileRes, cardsRes] = await Promise.all([
           consumerApi.getCategories(),
+          consumerApi.getProfile(),
           nfcApi.getMyCards()
         ]);
         setCategories(c.data.categories || []);
         if (cardsRes.data.success) {
           setNfcCards(cardsRes.data.data || []);
         }
+
+        let currentLocation = customerLocation;
+
+        // If no location in localStorage, try loading from profile
+        if (!currentLocation && profileRes.data.success && profileRes.data.data.address) {
+          const addr = profileRes.data.data.address;
+          const parts = addr.split(',').map((p: string) => p.trim());
+          if (parts.length >= 2) {
+            const loc = {
+              cell: parts.length === 3 ? parts[0] : '',
+              sector: parts.length === 3 ? parts[1] : parts[0],
+              district: parts.length === 3 ? parts[2] : parts[1]
+            };
+            currentLocation = loc;
+            setCustomerLocation(loc);
+            localStorage.setItem('bigcompany_location', JSON.stringify(loc));
+            setShowLocationModal(false);
+          }
+        }
+
+        // Auto-fetch stores if location exists (either from localStorage or profile)
+        if (currentLocation) {
+          const response = await consumerApi.getRetailers({
+            district: currentLocation.district,
+            sector: currentLocation.sector,
+            cell: currentLocation.cell
+          });
+          setRetailers(response.data.retailers || []);
+          if (!selectedRetailer && response.data.retailers?.length > 0) {
+            setShowRetailerModal(true);
+          }
+        }
       } catch (error) {
         console.error("Error fetching shop data:", error);
-        message.error("Failed to load categories");
+        message.error("Failed to load initial shop data");
         setCategories([]);
       } finally { setLoading(false); }
     };
     init();
-  }, []);
+  }, [customerLocation, selectedRetailer]);
 
   const fetchProducts = useCallback(async () => {
-    if (!selectedRetailer) return;
+    // Use URL retailerId if available, otherwise use selected retailer
+    const retailerIdToFetch = urlRetailerId || selectedRetailer?.id;
+    if (!retailerIdToFetch) return;
+
     setLoadingProducts(true);
     try {
-      const res = await consumerApi.getProducts({ retailerId: selectedRetailer.id });
+      const res = await consumerApi.getProducts({ retailerId: retailerIdToFetch });
       setProducts(res.data.products || []);
+      setCanBuy(res.data.canBuy || false);
+      setIsLinked(res.data.isLinked || false);
+      if (res.data.retailerInfo) {
+        setViewingRetailerInfo(res.data.retailerInfo);
+      }
     } catch (error) {
       console.error("Error fetching products:", error);
       message.error("Failed to load products");
       setProducts([]);
     }
     finally { setLoadingProducts(false); }
-  }, [selectedRetailer]);
+  }, [selectedRetailer, urlRetailerId]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
 
@@ -165,8 +229,16 @@ export const ShopPage: React.FC = () => {
 
   const handleLocationSubmit = async (v: CustomerLocation) => {
     setCustomerLocation(v);
+    localStorage.setItem('bigcompany_location', JSON.stringify(v));
+    
     setLoading(true);
     try {
+      // Formatted address for database
+      const addressString = `${v.cell}, ${v.sector}, ${v.district}`;
+      
+      // Save to database
+      await consumerApi.updateProfile({ address: addressString });
+
       const response = await consumerApi.getRetailers({
         district: v.district,
         sector: v.sector,
@@ -176,11 +248,11 @@ export const ShopPage: React.FC = () => {
       if (response.data.retailers?.length === 0) {
         message.info("No stores found in this location");
       } else {
-        message.success(`Found ${response.data.retailers.length} stores nearby`);
+        message.success(`Location saved and ${response.data.retailers.length} stores found`);
       }
     } catch (error) {
-      console.error("Error fetching retailers:", error);
-      message.error("Failed to find stores");
+      console.error("Error updating location:", error);
+      message.error("Failed to save location to profile");
     } finally {
       setLoading(false);
       setShowLocationModal(false);
@@ -194,6 +266,12 @@ export const ShopPage: React.FC = () => {
   };
 
   const handleAddToCart = (p: Product) => {
+    // Block if not allowed to buy
+    if (!canBuy) {
+      message.warning('You must be linked to this retailer to add items to cart. Send a link request first.');
+      return;
+    }
+
     // Handle backend simple format
     if (p.price !== undefined) {
       addItem({
@@ -294,7 +372,19 @@ export const ShopPage: React.FC = () => {
         <div className="hero-section">
           <Row justify="space-between" align="middle">
             <Col md={16}>
-              <Text style={{ opacity: 0.8, fontWeight: 700 }}>WELCOME BACK, {user?.name?.toUpperCase() || 'USER'}</Text>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <Text style={{ opacity: 0.8, fontWeight: 700 }}>WELCOME BACK, {user?.name?.toUpperCase() || 'USER'}</Text>
+                {customerLocation && (
+                  <Button 
+                    size="small" 
+                    icon={<EnvironmentOutlined />} 
+                    onClick={() => setShowLocationModal(true)}
+                    style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', borderRadius: 8 }}
+                  >
+                    {customerLocation.sector}, {customerLocation.district} (Change)
+                  </Button>
+                )}
+              </div>
               <Title level={1} style={{ color: 'white', margin: '8px 0', fontSize: 42 }}>Freshness at your doorstep.</Title>
               <Input size="large" placeholder="Search products..." prefix={<SearchOutlined style={{ color: '#10b981' }} />} value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ height: 56, borderRadius: 16, marginTop: 16 }} />
             </Col>
@@ -315,12 +405,75 @@ export const ShopPage: React.FC = () => {
           </Space>
         </div>
 
-        {selectedRetailer ? (
+        {(selectedRetailer || urlRetailerId) ? (
           <div>
-            <Card style={{ marginBottom: 32, border: '1px solid #10b981', background: '#f0fdf4' }}>
+            {/* Read-Only Banner for unlinked retailers - with Send Link Request button */}
+            {!canBuy && urlRetailerId && (
+              <Alert
+                message={<Text strong><LockOutlined /> Read-Only Mode - Link Required to Order</Text>}
+                description={
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Text>You are viewing {viewingRetailerInfo?.shopName || 'this retailer'}'s products. To place orders, you must first send a link request and wait for approval.</Text>
+                    <Space>
+                      <Button
+                        type="primary"
+                        size="small"
+                        icon={<SendOutlined />}
+                        style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                        onClick={() => navigate('/consumer/discover-retailers')}
+                      >
+                        Send Link Request
+                      </Button>
+                      <Button size="small" onClick={() => navigate('/consumer/discover-retailers')}>
+                        View All Retailers
+                      </Button>
+                    </Space>
+                  </Space>
+                }
+                type="warning"
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            {/* Retailer Info Card */}
+            <Card style={{ marginBottom: 32, border: canBuy ? '1px solid #10b981' : '1px solid #faad14', background: canBuy ? '#f0fdf4' : '#fffbe6' }}>
               <Row justify="space-between" align="middle">
-                <Col><Space><Avatar src={selectedRetailer.image} size={48} /><div><Text strong>{selectedRetailer.name}</Text><div style={{ fontSize: 12, opacity: 0.6 }}>{selectedRetailer.location}</div></div></Space></Col>
-                <Col><Button shape="round" onClick={() => setShowRetailerModal(true)}>Change Store</Button></Col>
+                <Col>
+                  <Space>
+                    <Avatar src={selectedRetailer?.image} size={48} icon={<ShopOutlined />} />
+                    <div>
+                      <Text strong>{viewingRetailerInfo?.shopName || selectedRetailer?.name || 'Retailer'}</Text>
+                      <div style={{ fontSize: 12, opacity: 0.6 }}>{viewingRetailerInfo?.address || selectedRetailer?.location}</div>
+                      {canBuy ? (
+                        <Tag color="green" style={{ marginTop: 4 }}>Linked - Can Order</Tag>
+                      ) : (
+                        <Tag color="orange" style={{ marginTop: 4 }}>Not Linked - View Only</Tag>
+                      )}
+                    </div>
+                  </Space>
+                </Col>
+                <Col>
+                  <Space>
+                    {/* Send Link Request button - visible when not linked */}
+                    {!canBuy && urlRetailerId && (
+                      <Button
+                        type="primary"
+                        icon={<SendOutlined />}
+                        style={{ backgroundColor: '#52c41a', borderColor: '#52c41a' }}
+                        onClick={() => navigate('/consumer/discover-retailers')}
+                      >
+                        Send Link Request
+                      </Button>
+                    )}
+                    {urlRetailerId && (
+                      <Button shape="round" onClick={() => navigate('/consumer/discover-retailers')}>Back to Retailers</Button>
+                    )}
+                    {!urlRetailerId && (
+                      <Button shape="round" onClick={() => setShowRetailerModal(true)}>Change Store</Button>
+                    )}
+                  </Space>
+                </Col>
               </Row>
             </Card>
 
@@ -357,14 +510,20 @@ export const ShopPage: React.FC = () => {
                         <Title level={5} style={{ margin: '4px 0 12px', height: 44, overflow: 'hidden' }}>{productName}</Title>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Text strong style={{ fontSize: 18, color: '#059669' }}>{formatPrice(pr)}</Text>
-                          {q > 0 ? (
-                            <Space style={{ background: '#f0fdf4', borderRadius: 10, padding: 4 }}>
-                              <Button size="small" type="text" icon={<MinusOutlined />} onClick={() => updateQuantity(p.id, q - 1)} />
-                              <Text strong>{q}</Text>
-                              <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => updateQuantity(p.id, q + 1)} />
-                            </Space>
+                          {canBuy ? (
+                            q > 0 ? (
+                              <Space style={{ background: '#f0fdf4', borderRadius: 10, padding: 4 }}>
+                                <Button size="small" type="text" icon={<MinusOutlined />} onClick={() => updateQuantity(p.id, q - 1)} />
+                                <Text strong>{q}</Text>
+                                <Button size="small" type="text" icon={<PlusOutlined />} onClick={() => updateQuantity(p.id, q + 1)} />
+                              </Space>
+                            ) : (
+                              <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={() => handleAddToCart(p)} disabled={stock === 0} />
+                            )
                           ) : (
-                            <Button type="primary" shape="circle" icon={<PlusOutlined />} onClick={() => handleAddToCart(p)} disabled={stock === 0} />
+                            <Tooltip title="Link with this retailer to order">
+                              <Button shape="circle" icon={<LockOutlined />} disabled />
+                            </Tooltip>
                           )}
                         </div>
                       </Card>
@@ -378,7 +537,13 @@ export const ShopPage: React.FC = () => {
           <div style={{ textAlign: 'center', padding: 100, background: 'white', borderRadius: 28 }}>
             <ShopOutlined style={{ fontSize: 64, color: '#10b981', opacity: 0.2, marginBottom: 24 }} />
             <Title level={3}>Choose a Store to Begin</Title>
-            <Button type="primary" size="large" onClick={() => setShowRetailerModal(true)} style={{ marginTop: 16 }}>Browse Retailers</Button>
+            <Text type="secondary" style={{ display: 'block', marginBottom: 24 }}>
+              Browse available retailers or go to "Find & Link Retailer" to send a link request.
+            </Text>
+            <Space>
+              <Button type="primary" size="large" onClick={() => setShowRetailerModal(true)}>Browse Retailers</Button>
+              <Button size="large" onClick={() => navigate('/consumer/discover-retailers')}>Link a Retailer</Button>
+            </Space>
           </div>
         )}
 
@@ -423,8 +588,16 @@ export const ShopPage: React.FC = () => {
                   <Card key={item.id} size="small">
                     <Row align="middle" gutter={12}>
                       <Col span={4}><Avatar src={item.image} shape="square" /></Col>
-                      <Col span={14}><Text strong>{item.name}</Text><div>{formatPrice(item.price)}</div></Col>
-                      <Col span={6} style={{ textAlign: 'right' }}><Text strong>x{item.quantity}</Text></Col>
+                      <Col span={12}><Text strong>{item.name}</Text><div>{formatPrice(item.price)}</div></Col>
+                      <Col span={5} style={{ textAlign: 'right' }}><Text strong>x{item.quantity}</Text></Col>
+                      <Col span={3} style={{ textAlign: 'right' }}>
+                        <Button 
+                          type="text" 
+                          danger 
+                          icon={<DeleteOutlined />} 
+                          onClick={() => removeItem(item.productId)}
+                        />
+                      </Col>
                     </Row>
                   </Card>
                 ))}

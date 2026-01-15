@@ -35,7 +35,9 @@ import {
   CheckCircleTwoTone,
   CloseCircleTwoTone,
   ClockCircleTwoTone,
+  EyeOutlined,
 } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import type { ColumnsType } from 'antd/es/table';
 import { adminApi } from '../../services/apiService';
 
@@ -71,13 +73,28 @@ interface WholesalerAccount {
   created_at: string;
 }
 
+interface CustomerAccount {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  address?: string;
+  walletBalance: number;
+  rewardsPoints: number;
+  status: 'active' | 'inactive';
+  isVerified: boolean;
+  created_at: string;
+}
+
 const AccountManagementPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [retailers, setRetailers] = useState<RetailerAccount[]>([]);
   const [wholesalers, setWholesalers] = useState<WholesalerAccount[]>([]);
+  const [customers, setCustomers] = useState<CustomerAccount[]>([]);
   const [createRetailerModalVisible, setCreateRetailerModalVisible] = useState(false);
   const [createWholesalerModalVisible, setCreateWholesalerModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('retailers');
+  const [activeTab, setActiveTab] = useState('customers');
   const [searchText, setSearchText] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -92,9 +109,10 @@ const AccountManagementPage: React.FC = () => {
   const loadAccounts = async () => {
     setLoading(true);
     try {
-      const [retailersRes, wholesalersRes] = await Promise.all([
+      const [retailersRes, wholesalersRes, customersRes] = await Promise.all([
         adminApi.getRetailers(),
         adminApi.getWholesalers(),
+        adminApi.getCustomers(),
       ]);
 
       if (retailersRes.data?.retailers) {
@@ -105,8 +123,8 @@ const AccountManagementPage: React.FC = () => {
           phone: r.user?.phone,
           address: r.address,
           credit_limit: r.creditLimit,
-          orders: 0, 
-          revenue: 0, 
+          orders: 0,
+          revenue: 0,
           status: r.user?.isActive ? 'active' : 'inactive',
           verified: r.isVerified,
           created_at: r.user?.createdAt || r.createdAt
@@ -120,13 +138,28 @@ const AccountManagementPage: React.FC = () => {
           email: w.user?.email,
           phone: w.user?.phone,
           address: w.address,
-          orders: 0, 
-          revenue: 0, 
+          orders: 0,
+          revenue: 0,
           status: w.user?.isActive ? 'active' : 'inactive',
           verified: w.isVerified,
           created_at: w.user?.createdAt || w.createdAt
         }));
         setWholesalers(mappedWholesalers);
+      }
+      if (customersRes.data?.customers) {
+        const mappedCustomers = customersRes.data.customers.map((c: any) => ({
+          id: c.id,
+          name: c.user?.name || c.fullName || 'N/A',
+          email: c.user?.email,
+          phone: c.user?.phone,
+          address: c.address,
+          walletBalance: c.walletBalance || 0,
+          rewardsPoints: c.rewardsPoints || 0,
+          status: c.user?.isActive ? 'active' : 'inactive',
+          isVerified: c.isVerified,
+          created_at: c.user?.createdAt || c.createdAt
+        }));
+        setCustomers(mappedCustomers);
       }
     } catch (error: any) {
       console.error('Failed to load accounts:', error);
@@ -333,6 +366,15 @@ const AccountManagementPage: React.FC = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            className="text-purple-600"
+            onClick={() => navigate(`/admin/account-details/${record.id}?type=retailer`)}
+          >
+            View
+          </Button>
           <Button type="link" size="small" className="text-blue-600" onClick={() => handleEditRetailer(record)}>Edit</Button>
           <Button type="link" danger size="small" onClick={() => handleDeleteRetailer(record.id)}>Delete</Button>
           {!record.verified && (
@@ -408,6 +450,15 @@ const AccountManagementPage: React.FC = () => {
       key: 'actions',
       render: (_, record) => (
         <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            className="text-purple-600"
+            onClick={() => navigate(`/admin/account-details/${record.id}?type=wholesaler`)}
+          >
+            View
+          </Button>
           <Button type="link" size="small" className="text-blue-600" onClick={() => handleEditWholesaler(record)}>Edit</Button>
           <Button type="link" danger size="small" onClick={() => handleDeleteWholesaler(record.id)}>Delete</Button>
           {!record.verified && (
@@ -433,6 +484,75 @@ const AccountManagementPage: React.FC = () => {
     },
   ];
 
+  // Customer columns
+  const customerColumns: ColumnsType<CustomerAccount> = [
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text) => (
+        <span className="font-semibold text-gray-800">{text || 'N/A'}</span>
+      ),
+    },
+    {
+      title: 'Contact',
+      key: 'contact',
+      render: (_, record) => (
+        <div className="flex flex-col">
+          <span className="text-gray-600 text-sm">{record.email || 'N/A'}</span>
+          <span className="text-gray-400 text-xs">{record.phone || 'N/A'}</span>
+        </div>
+      ),
+    },
+    {
+      title: 'Wallet Balance',
+      dataIndex: 'walletBalance',
+      key: 'walletBalance',
+      render: (value) => <span className="font-medium text-green-600">{(value || 0).toLocaleString()} RWF</span>,
+    },
+    {
+      title: 'Rewards',
+      dataIndex: 'rewardsPoints',
+      key: 'rewardsPoints',
+      render: (value) => <span className="text-orange-500">{(value || 0).toLocaleString()} pts</span>,
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status) => (
+        <Tag className="rounded-full px-3" color={status === 'active' ? 'green' : 'default'}>
+          {status?.toUpperCase() || 'UNKNOWN'}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Verified',
+      dataIndex: 'isVerified',
+      key: 'isVerified',
+      render: (verified) => (
+        verified ? <CheckCircleTwoTone twoToneColor="#52c41a" /> : <CloseCircleTwoTone twoToneColor="#f5222d" />
+      ),
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_, record) => (
+        <Space>
+          <Button
+            type="link"
+            size="small"
+            icon={<EyeOutlined />}
+            className="text-purple-600"
+            onClick={() => navigate(`/admin/account-details/${record.id}?type=customer`)}
+          >
+            View Account
+          </Button>
+        </Space>
+      ),
+    },
+  ];
+
   const filteredRetailers = retailers.filter(r =>
     r.business_name?.toLowerCase().includes(searchText.toLowerCase()) ||
     r.email?.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -445,13 +565,19 @@ const AccountManagementPage: React.FC = () => {
     w.phone?.includes(searchText)
   );
 
+  const filteredCustomers = customers.filter(c =>
+    c.name?.toLowerCase().includes(searchText.toLowerCase()) ||
+    c.email?.toLowerCase().includes(searchText.toLowerCase()) ||
+    c.phone?.includes(searchText)
+  );
+
   const stats = [
+    { title: 'Total Customers', value: customers.length, icon: <UserOutlined />, color: 'cyan' },
+    { title: 'Active Customers', value: customers.filter(c => c.status === 'active').length, icon: <CheckCircleTwoTone twoToneColor="#52c41a" />, color: 'green' },
     { title: 'Total Retailers', value: retailers.length, icon: <ShopOutlined />, color: 'blue' },
     { title: 'Active Retailers', value: retailers.filter(r => r.status === 'active').length, icon: <CheckCircleTwoTone twoToneColor="#52c41a" />, color: 'green' },
-    { title: 'Pending Approval', value: retailers.filter(r => r.status === 'pending' || !r.verified).length, icon: <ClockCircleTwoTone twoToneColor="#faad14" />, color: 'orange' },
     { title: 'Total Wholesalers', value: wholesalers.length, icon: <BankOutlined />, color: 'purple' },
     { title: 'Active Wholesalers', value: wholesalers.filter(w => w.status === 'active').length, icon: <CheckCircleTwoTone twoToneColor="#52c41a" />, color: 'green' },
-    { title: 'Total Revenue', value: '0.0M RWF', icon: null, color: 'cyan' },
   ];
 
   return (
@@ -464,7 +590,7 @@ const AccountManagementPage: React.FC = () => {
               <span className="p-2 bg-blue-500/30 rounded-lg text-2xl"><UserOutlined /></span>
               <h1 className="text-3xl font-bold m-0 text-white">Account Management</h1>
             </div>
-            <p className="text-blue-100 text-lg opacity-90">Create and manage retailer & wholesaler accounts</p>
+            <p className="text-blue-100 text-lg opacity-90">View and manage customer, retailer & wholesaler accounts</p>
           </div>
           <Button 
             icon={<ReloadOutlined />} 
@@ -516,6 +642,14 @@ const AccountManagementPage: React.FC = () => {
             className="account-tabs border-none"
             items={[
               {
+                key: 'customers',
+                label: (
+                  <span className="flex items-center gap-2 px-4 py-2 text-lg">
+                    <UserOutlined /> Customers ({customers.length})
+                  </span>
+                ),
+              },
+              {
                 key: 'retailers',
                 label: (
                    <span className="flex items-center gap-2 px-4 py-2 text-lg">
@@ -533,31 +667,39 @@ const AccountManagementPage: React.FC = () => {
               },
             ]}
           />
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            size="large"
-            className="bg-blue-600 hover:bg-blue-700 h-10 px-8 rounded-lg mb-4"
-            onClick={() => {
-              if (activeTab === 'retailers') {
-                retailerForm.resetFields();
-                setEditingId(null);
-                setCreateRetailerModalVisible(true);
-              } else {
-                wholesalerForm.resetFields();
-                setEditingId(null);
-                setCreateWholesalerModalVisible(true);
-              }
-            }}
-          >
-            {activeTab === 'retailers' ? 'Create Retailer' : 'Create Wholesaler'}
-          </Button>
+          {activeTab !== 'customers' && (
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              size="large"
+              className="bg-blue-600 hover:bg-blue-700 h-10 px-8 rounded-lg mb-4"
+              onClick={() => {
+                if (activeTab === 'retailers') {
+                  retailerForm.resetFields();
+                  setEditingId(null);
+                  setCreateRetailerModalVisible(true);
+                } else {
+                  wholesalerForm.resetFields();
+                  setEditingId(null);
+                  setCreateWholesalerModalVisible(true);
+                }
+              }}
+            >
+              {activeTab === 'retailers' ? 'Create Retailer' : 'Create Wholesaler'}
+            </Button>
+          )}
         </div>
 
         <div className="p-0">
           <Table
-            columns={activeTab === 'retailers' ? retailerColumns : wholesalerColumns}
-            dataSource={activeTab === 'retailers' ? filteredRetailers : filteredWholesalers}
+            columns={
+              activeTab === 'customers' ? customerColumns :
+              activeTab === 'retailers' ? retailerColumns : wholesalerColumns
+            }
+            dataSource={
+              activeTab === 'customers' ? filteredCustomers :
+              activeTab === 'retailers' ? filteredRetailers : filteredWholesalers
+            }
             rowKey="id"
             loading={loading}
             className="custom-account-table"
@@ -570,7 +712,9 @@ const AccountManagementPage: React.FC = () => {
               emptyText: (
                 <div className="py-20 flex flex-col items-center">
                   <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mb-4 transition-transform hover:scale-110">
-                    <ShopOutlined className="text-gray-300 text-4xl" />
+                    {activeTab === 'customers' ? <UserOutlined className="text-gray-300 text-4xl" /> :
+                     activeTab === 'retailers' ? <ShopOutlined className="text-gray-300 text-4xl" /> :
+                     <BankOutlined className="text-gray-300 text-4xl" />}
                   </div>
                   <p className="text-gray-400 text-lg">No data</p>
                 </div>
