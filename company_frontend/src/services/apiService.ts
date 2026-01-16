@@ -51,7 +51,7 @@ export const employeeApi = {
 // Consumer/Shop APIs
 export const consumerApi = {
   // Retailers
-  getRetailers: (params?: { lat?: number; lng?: number; district?: string; sector?: string; cell?: string }) =>
+  getRetailers: (params?: { lat?: number; lng?: number; province?: string; district?: string; sector?: string; cell?: string; search?: string }) =>
     api.get("/store/retailers", { params }),
 
   // Categories
@@ -94,7 +94,7 @@ export const consumerApi = {
   trackOrder: (id: string) => api.get(`/store/customers/me/orders/${id}/track`),
   cancelOrder: (id: string, reason: string) => api.post(`/store/orders/${id}/cancel`, { reason }),
   confirmDelivery: (id: string) => api.post(`/store/orders/${id}/confirm-delivery`),
-  createOrder: (data: { retailerId: string; items: any[]; paymentMethod: string; total: number }) => api.post('/store/orders', data),
+  createOrder: (data: { retailerId: string; items: any[]; paymentMethod: string; total: number; meterId?: string; cardId?: number }) => api.post('/store/orders', data),
 
   // Wallet
   getWallet: () => api.get("/store/wallet/balance"), // Legacy route

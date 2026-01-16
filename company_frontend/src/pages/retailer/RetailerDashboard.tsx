@@ -75,9 +75,12 @@ interface DashboardStats {
   pendingOrders: number;
   totalRevenue: number; // Capital + Profit wallet combined
   inventoryItems: number;
-  lowStockItems: number;
+  lowStockItems: any[]; // Changed to array
+  lowStockCount: number; // New field
   capitalWallet: number; // Inventory value at wholesaler price
   profitWallet: number; // Profit margin from sales
+  totalProfit: number; // NEW
+  profitMargin: string; // NEW
   creditLimit: number;
   todaySales?: number;
   customersToday?: number;
@@ -168,9 +171,12 @@ export const RetailerDashboard: React.FC = () => {
         pendingOrders: 0,
         totalRevenue: 0,
         inventoryItems: 0,
-        lowStockItems: 0,
+        lowStockItems: [],
+        lowStockCount: 0,
         capitalWallet: 0,
         profitWallet: 0,
+        totalProfit: 0,
+        profitMargin: '0',
         creditLimit: 0,
         todaySales: 0,
         customersToday: 0,
@@ -373,7 +379,7 @@ export const RetailerDashboard: React.FC = () => {
             <Space split={<Divider type="vertical" />}>
               <span><FireOutlined style={{ color: '#fa541c' }} /> Today's Sales: <Text strong>{formatCurrency(stats?.todaySales || 0)}</Text></span>
               <span><UserOutlined style={{ color: '#1890ff' }} /> Customers: <Text strong>{stats?.customersToday || 0}</Text></span>
-              <span><WarningOutlined style={{ color: '#fa8c16' }} /> Low Stock: <Text strong>{stats?.lowStockItems || 0} items</Text></span>
+              <span><WarningOutlined style={{ color: '#fa8c16' }} /> Low Stock: <Text strong>{stats?.lowStockCount || 0} items</Text></span>
             </Space>
           }
           type="info"
@@ -410,7 +416,7 @@ export const RetailerDashboard: React.FC = () => {
             suffix: <Text type="secondary" style={{ fontSize: 11 }}>Inventory value at wholesaler price</Text>,
             extra: (
               <div style={{ marginTop: 4 }}>
-                <Text type="secondary" style={{ fontSize: 11 }}>{stats?.inventoryItems || 0} products • <Text type="danger">{stats?.lowStockItems || 0} low stock</Text></Text>
+                <Text type="secondary" style={{ fontSize: 11 }}>{stats?.inventoryItems || 0} products • <Text type="danger">{stats?.lowStockCount || 0} low stock</Text></Text>
               </div>
             ),
           },
@@ -497,7 +503,7 @@ export const RetailerDashboard: React.FC = () => {
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                   <XAxis dataKey="name" stroke="#8c8c8c" />
-                  <YAxis yAxisId="left" stroke="#1890ff" tickFormatter={(v) => `${(v / 1000).toFixed(0)}K`} />
+                  <YAxis yAxisId="left" stroke="#1890ff" tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}K`} />
                   <YAxis yAxisId="right" orientation="right" stroke="#52c41a" />
                   <RechartsTooltip
                     formatter={(value: number, name: string) =>
@@ -556,7 +562,7 @@ export const RetailerDashboard: React.FC = () => {
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
-                  <RechartsTooltip formatter={(value) => `${value}%`} />
+                  <RechartsTooltip formatter={(value: number) => `${value}%`} />
                 </PieChart>
               </ResponsiveContainer>
               <Divider style={{ margin: '12px 0' }} />
@@ -711,7 +717,7 @@ export const RetailerDashboard: React.FC = () => {
                 <Space>
                   <WarningOutlined style={{ color: '#fa8c16' }} />
                   <Text strong>Low Stock Alert</Text>
-                  <Badge count={lowStockItems.length} style={{ backgroundColor: '#fa8c16' }} />
+                  <Badge count={stats?.lowStockCount || 0} style={{ backgroundColor: '#fa8c16' }} />
                 </Space>
               }
               extra={<Button type="primary" ghost icon={<PlusOutlined />} onClick={() => navigate('/retailer/add-stock')}>Order Stock</Button>}

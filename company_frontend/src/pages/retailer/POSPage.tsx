@@ -805,27 +805,35 @@ const POSPage = () => {
 
             {cardStep === 'meter_id' && (
               <div style={{ padding: '20px 0' }}>
-                <Title level={5} style={{ textAlign: 'center', marginBottom: 16 }}>Enter Gas Meter ID for Rewards</Title>
+                <Title level={5} style={{ textAlign: 'center', marginBottom: 16 }}>Enter Gas Meter ID</Title>
+                <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 16 }}>
+                  Required for Dashboard Wallet (Gas Rewards Eligible)
+                </Text>
                 <Input
                   size="large"
-                  placeholder="Enter customer's gas meter ID"
+                  placeholder="Meter ID (e.g. MTR-12345)"
                   value={gasMeterID}
                   onChange={(e) => setGasMeterID(e.target.value)}
-                  prefix={<span style={{ color: '#fa541c' }}>🔥</span>}
+                  style={{ textAlign: 'center' }}
                 />
-                <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
-                  Customer will receive gas rewards based on purchase profit
-                </Text>
                 <Button
                   type="primary"
                   size="large"
                   block
-                  loading={processing}
                   style={{ marginTop: 16 }}
+                  disabled={!gasMeterID}
                   onClick={handlePayment}
                 >
-                  {processing ? 'Processing...' : `Pay ${total.toLocaleString()} RWF`}
+                  Complete Payment
                 </Button>
+                 <Button
+                  type="text"
+                  block
+                  style={{ marginTop: 8 }}
+                  onClick={() => setCardStep('wallet_choice')}
+                >
+                  Back
+                 </Button>
               </div>
             )}
           </div>

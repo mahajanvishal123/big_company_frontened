@@ -170,17 +170,50 @@ export const ShopPage: React.FC = () => {
           }
         }
 
-        // Auto-fetch stores if location exists (either from localStorage or profile)
+        // NEW: Load linked retailers from profile
+        if (profileRes.data.success && profileRes.data.data.linkedRetailers) {
+          const linked = profileRes.data.data.linkedRetailers.map((r: any) => ({
+            id: r.id,
+            name: r.shopName,
+            location: r.address,
+            image: r.image, // Ensure image is passed if available
+            isLinked: true
+          }));
+          setRetailers(linked);
+          
+          // Auto-show modal if not already viewing a specific retailer
+          if (!selectedRetailer && !urlRetailerId && linked.length > 0) {
+            setShowRetailerModal(true);
+          }
+        }
+
+        // Auto-fetch nearby stores if location exists (will append to linked ones)
         if (currentLocation) {
           const response = await consumerApi.getRetailers({
             district: currentLocation.district,
             sector: currentLocation.sector,
             cell: currentLocation.cell
           });
-          setRetailers(response.data.retailers || []);
-          if (!selectedRetailer && response.data.retailers?.length > 0) {
-            setShowRetailerModal(true);
-          }
+          
+          const nearby = response.data.retailers?.map((r: any) => ({
+             id: r.id,
+             name: r.shopName,
+             location: r.address,
+             image: r.image,
+             isLinked: r.requestStatus === 'approved'
+          })) || [];
+
+          setRetailers(prev => {
+             // Merge lists, avoiding duplicates
+             const ids = new Set(prev.map(p => p.id));
+             const combined = [...prev];
+             nearby.forEach((n: any) => {
+                if (!ids.has(n.id)) {
+                   combined.push(n);
+                }
+             });
+             return combined;
+          });
         }
       } catch (error) {
         console.error("Error fetching shop data:", error);
@@ -307,6 +340,7 @@ export const ShopPage: React.FC = () => {
         })),
         paymentMethod: paymentMethod, 
         cardId: values.cardId,
+        meterId: values.meterId, // Added Meter ID
         total: cartTotal
       };
 
@@ -558,6 +592,23 @@ export const ShopPage: React.FC = () => {
                   <Radio value="mobile_money">Mobile Money</Radio>
                 </Radio.Group>
               </Form.Item>
+
+              {['wallet', 'mobile_money'].includes(paymentMethod) && (
+                 <div style={{ marginBottom: 24, padding: 16, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
+                    <Text type="success" strong><StarFilled /> Earn Gas Rewards!</Text>
+                    <Paragraph style={{ margin: '8px 0', fontSize: 13 }}>
+                       Enter your Meter ID to receive 12% of the profit as gas units.
+                    </Paragraph>
+                    <Form.Item
+                        name="meterId"
+                        label="Gas Meter ID"
+                        rules={[{ required: true, message: 'Meter ID is required for rewards' }]}
+                        style={{ marginBottom: 0 }}
+                    >
+                        <Input placeholder="Enter Meter ID (e.g. MTR-12345)" prefix={<LockOutlined />} />
+                    </Form.Item>
+                 </div>
+              )}
               
               {paymentMethod === 'nfc_card' && (
                 <Form.Item 

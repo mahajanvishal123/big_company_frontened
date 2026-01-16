@@ -410,60 +410,69 @@ export const ProfilePage: React.FC = () => {
             </Space>
           </Card>
 
-          {/* My Retailer - Last purchased from */}
+          {/* My Linked Retailers */}
           <Card
-            title={<><LinkOutlined /> My Retailer</>}
+            title={<><LinkOutlined /> My Linked Retailers</>}
             style={{ marginTop: 24 }}
           >
-            {profileData?.linkedRetailer ? (
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-                  <Avatar
-                    size={48}
-                    icon={<ShopOutlined />}
-                    style={{ backgroundColor: '#1890ff', marginRight: 12 }}
-                  />
-                  <div>
-                    <Text strong style={{ fontSize: 16, display: 'block' }}>
-                      {profileData.linkedRetailer.shopName}
-                    </Text>
-                    <Tag color="blue">Retailer</Tag>
-                  </div>
-                </div>
-                <Divider style={{ margin: '12px 0' }} />
-                <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                  {profileData.linkedRetailer.phone && (
-                    <Text type="secondary">
-                      <PhoneOutlined style={{ marginRight: 8 }} />
-                      {profileData.linkedRetailer.phone}
-                    </Text>
-                  )}
-                  {profileData.linkedRetailer.email && (
-                    <Text type="secondary">
-                      <MailOutlined style={{ marginRight: 8 }} />
-                      {profileData.linkedRetailer.email}
-                    </Text>
-                  )}
-                  {profileData.linkedRetailer.address && (
-                    <Text type="secondary">
-                      <HomeOutlined style={{ marginRight: 8 }} />
-                      {profileData.linkedRetailer.address}
-                    </Text>
-                  )}
-                  {profileData.linkedRetailer.lastPurchaseDate && (
-                    <Text type="secondary" style={{ marginTop: 8 }}>
-                      <CalendarOutlined style={{ marginRight: 8 }} />
-                      Last purchase: {new Date(profileData.linkedRetailer.lastPurchaseDate).toLocaleDateString()}
-                    </Text>
-                  )}
-                </Space>
-              </div>
+            {profileData?.linkedRetailers && profileData.linkedRetailers.length > 0 ? (
+              <List
+                dataSource={profileData.linkedRetailers}
+                renderItem={(retailer: any) => (
+                  <List.Item key={retailer.id}>
+                    <div style={{ width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                        <Avatar
+                          size={40}
+                          icon={<ShopOutlined />}
+                          style={{ backgroundColor: retailer.id === profileData.linkedRetailer?.id ? '#52c41a' : '#1890ff', marginRight: 12 }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <Text strong style={{ fontSize: 14, display: 'block' }}>
+                              {retailer.shopName}
+                            </Text>
+                            {retailer.id === profileData.linkedRetailer?.id && (
+                              <Tag color="green" style={{ margin: 0, fontSize: 10 }}>Primary</Tag>
+                            )}
+                          </div>
+                          <Text type="secondary" style={{ fontSize: 12 }}>ID: {retailer.id}</Text>
+                        </div>
+                      </div>
+                      <Space direction="vertical" size={2} style={{ width: '100%', paddingLeft: 52 }}>
+                        {retailer.phone && (
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            <PhoneOutlined style={{ marginRight: 8 }} />
+                            {retailer.phone}
+                          </Text>
+                        )}
+                        {retailer.address && (
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            <HomeOutlined style={{ marginRight: 8 }} />
+                            {retailer.address}
+                          </Text>
+                        )}
+                      </Space>
+                      <div style={{ marginTop: 12, paddingLeft: 52 }}>
+                        <Button 
+                          type="primary" 
+                          size="small" 
+                          ghost 
+                          onClick={() => window.location.href = `/consumer/shop?retailerId=${retailer.id}`}
+                        >
+                          Shop Now
+                        </Button>
+                      </div>
+                    </div>
+                  </List.Item>
+                )}
+              />
             ) : (
               <div style={{ textAlign: 'center', color: '#999', padding: '16px 0' }}>
                 <ShopOutlined style={{ fontSize: 32, marginBottom: 8 }} />
-                <div>No retailer linked yet</div>
+                <div>No retailers linked yet</div>
                 <Text type="secondary" style={{ fontSize: 12 }}>
-                  Make your first purchase to link
+                  Discover and link with retailers to start shopping
                 </Text>
               </div>
             )}

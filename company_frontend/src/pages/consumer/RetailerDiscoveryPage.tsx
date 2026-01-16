@@ -14,7 +14,8 @@ import {
   Typography,
   Alert,
   Badge,
-  Tooltip
+  Tooltip,
+  Select // Added Select
 } from 'antd';
 import {
   SearchOutlined,
@@ -30,7 +31,7 @@ import {
   ShoppingCartOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
-import api from '../../services/apiService';
+import api, { consumerApi } from '../../services/apiService';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -67,6 +68,11 @@ const RetailerDiscoveryPage: React.FC = () => {
   const [myRequests, setMyRequests] = useState<LinkRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  // Location States
+  const [province, setProvince] = useState<string | undefined>(undefined);
+  const [district, setDistrict] = useState<string | undefined>(undefined);
+  const [sector, setSector] = useState<string | undefined>(undefined);
+
   const [currentLinkedId, setCurrentLinkedId] = useState<number | null>(null);
   const [selectedRetailer, setSelectedRetailer] = useState<Retailer | null>(null);
   const [requestMessage, setRequestMessage] = useState('');
@@ -84,17 +90,49 @@ const RetailerDiscoveryPage: React.FC = () => {
   }, [search]);
 
   const fetchRetailers = async () => {
-    setLoading(true);
+    // Only search if all location fields are present, OR if it's the initial load (optional)
+    // But requirement says "Strict address based".
+    
+    // Allow fetching all retailers by default (User request: "page per all retailers bhi dikhne chiye")
+    /*
+    if (!province || !district || !sector) {
+         return; 
+    }
+    */
+
     try {
-      const response = await api.get('/store/retailers/available', {
-        params: { search }
+      setLoading(true);
+      const response = await consumerApi.getRetailers({
+        province,
+        district, 
+        sector
       });
       setRetailers(response.data.retailers || []);
       setCurrentLinkedId(response.data.currentLinkedRetailerId || null);
     } catch (error: any) {
-      message.error('Failed to fetch retailers');
+      if (error.response?.status === 404) {
+          setRetailers([]); // No stores found
+      } else {
+          message.error('Failed to fetch retailers');
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [linkedRetailers, setLinkedRetailers] = useState<any[]>([]);
+  useEffect(() => {
+    fetchLinkedRetailers();
+  }, []);
+
+  const fetchLinkedRetailers = async () => {
+    try {
+      const response = await consumerApi.getProfile();
+      if (response.data.success && response.data.data.linkedRetailers) {
+        setLinkedRetailers(response.data.data.linkedRetailers);
+      }
+    } catch (error) {
+      console.error('Error fetching linked retailers:', error);
     }
   };
 
@@ -102,14 +140,13 @@ const RetailerDiscoveryPage: React.FC = () => {
     try {
       const response = await api.get('/store/retailers/link-requests');
       setMyRequests(response.data.requests || []);
-    } catch (error: any) {
-      console.error('Failed to fetch requests:', error);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
     }
   };
 
   const handleSendRequest = async () => {
     if (!selectedRetailer) return;
-
     setSendingRequest(true);
     try {
       await api.post('/store/retailers/link-request', {
@@ -322,6 +359,52 @@ const RetailerDiscoveryPage: React.FC = () => {
         />
       )}
 
+      {/* NEW: My Linked Retailers Section */}
+      {linkedRetailers.length > 0 && (
+        <Card 
+          title={<><LinkOutlined /> My Linked Retailers</>} 
+          style={{ marginBottom: 24, border: '1px solid #52c41a' }}
+        >
+          <Table
+            size="small"
+            dataSource={linkedRetailers}
+            rowKey="id"
+            pagination={false}
+            columns={[
+              {
+                title: 'Retailer',
+                key: 'retailer',
+                render: (_, record) => (
+                  <Space>
+                    <ShopOutlined />
+                    <Text strong>{record.shopName}</Text>
+                  </Space>
+                )
+              },
+              {
+                title: 'Location',
+                dataIndex: 'address',
+                key: 'address',
+              },
+              {
+                title: 'Action',
+                key: 'action',
+                align: 'right',
+                render: (_, record) => (
+                  <Button 
+                    type="primary" 
+                    icon={<ShoppingCartOutlined />} 
+                    onClick={() => navigate(`/consumer/shop?retailerId=${record.id}`)}
+                  >
+                    Shop Now
+                  </Button>
+                )
+              }
+            ]}
+          />
+        </Card>
+      )}
+
       {myRequests.filter(r => r.status === 'pending').length > 0 && (
         <Card title="Pending Requests" size="small" style={{ marginBottom: 16 }}>
           <Space direction="vertical" style={{ width: '100%' }}>
@@ -344,14 +427,89 @@ const RetailerDiscoveryPage: React.FC = () => {
       )}
 
       <Card>
-        <Space style={{ marginBottom: 16 }}>
-          <Input
-            placeholder="Search retailers..."
-            prefix={<SearchOutlined />}
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ width: 300 }}
-          />
+        <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Title level={5}>Find Store by Location</Title>
+            <Button 
+               type="link" 
+               onClick={() => {
+                 setProvince(undefined);
+                 setDistrict(undefined);
+                 setSector(undefined);
+                 fetchRetailers();
+               }}
+            >
+               Show All Retailers
+            </Button>
+          </div>
+          <Space wrap>
+            <Select
+              placeholder="Select Province"
+              style={{ width: 200 }}
+              onChange={(value) => {
+                setProvince(value);
+                setDistrict(undefined); // Reset dependent fields
+                setSector(undefined);
+              }}
+              value={province}
+              allowClear
+            >
+              <Select.Option value="Kigali">Kigali City</Select.Option>
+              <Select.Option value="North">Northern Province</Select.Option>
+              <Select.Option value="South">Southern Province</Select.Option>
+              <Select.Option value="East">Eastern Province</Select.Option>
+              <Select.Option value="West">Western Province</Select.Option>
+            </Select>
+
+            <Select
+              placeholder="Select District"
+              style={{ width: 200 }}
+              disabled={!province}
+              onChange={(value) => {
+                 setDistrict(value);
+                 setSector(undefined);
+              }}
+              value={district}
+              allowClear
+            >
+              {province === 'Kigali' && (
+                <>
+                  <Select.Option value="Gasabo">Gasabo</Select.Option>
+                  <Select.Option value="Kicukiro">Kicukiro</Select.Option>
+                  <Select.Option value="Nyarugenge">Nyarugenge</Select.Option>
+                </>
+              )}
+               {province && province !== 'Kigali' && (
+                 <Select.Option value="Demo District">Demo District</Select.Option>
+               )}
+            </Select>
+
+             <Input 
+                placeholder="Enter Sector" 
+                style={{ width: 200 }} 
+                disabled={!district}
+                value={sector}
+                onChange={(e) => setSector(e.target.value)}
+             />
+
+            <Button 
+                type="primary" 
+                icon={<SearchOutlined />} 
+                onClick={fetchRetailers}
+            >
+              Find Stores
+            </Button>
+            
+            <Button onClick={() => {
+                setProvince(undefined);
+                setDistrict(undefined);
+                setSector(undefined);
+                setRetailers([]);
+                fetchRetailers();
+            }}>
+                Clear
+            </Button>
+          </Space>
         </Space>
 
         {loading ? (
@@ -361,12 +519,14 @@ const RetailerDiscoveryPage: React.FC = () => {
         ) : retailers.length === 0 ? (
           <Empty description="No retailers found" />
         ) : (
-          <Table
-            columns={columns}
-            dataSource={retailers}
-            rowKey="id"
-            pagination={{ pageSize: 10 }}
-          />
+          retailers.length > 0 && (
+            <Table
+                columns={columns}
+                dataSource={retailers}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+            />
+          )
         )}
       </Card>
 
