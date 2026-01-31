@@ -213,6 +213,10 @@ export const retailerApi = {
   getWholesalers: () => api.get("/retailer/wholesalers"),
   getWholesalerProducts: (params?: any) =>
     api.get("/retailer/wholesaler/products", { params }), // Correct endpoint
+  getPurchaseOrders: (params?: any) => 
+    api.get("/retailer/wholesaler/orders", { params }),
+  getPurchaseOrder: (id: string) => 
+    api.get(`/retailer/wholesaler/orders/${id}`),
 
   // Branch Management
   getBranches: () => api.get("/retailer/branches"),

@@ -77,6 +77,10 @@ const AddStockPage: React.FC = () => {
   const [canBuy, setCanBuy] = useState(false);
   const [isLinked, setIsLinked] = useState(false);
   const [viewingWholesalerInfo, setViewingWholesalerInfo] = useState<{id: number, companyName: string, address: string} | null>(null);
+  
+  // NEW: Payment and Credit states
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'credit' | 'momo'>('wallet');
+  const [creditInfo, setCreditInfo] = useState<{available: number, limit: number, used: number} | null>(null);
 
   // Load wholesaler products and wallet balance
   useEffect(() => {
@@ -110,6 +114,20 @@ const AddStockPage: React.FC = () => {
       setCapitalWalletBalance(walletRes.data?.capital_wallet_balance || walletRes.data?.balance || 0);
     } catch (error: any) {
       console.error('Failed to load wallet:', error);
+    }
+
+    // 3. Fetch Credit Info
+    try {
+      const creditRes = await retailerApi.getCreditInfo();
+      if (creditRes.data?.credit) {
+        setCreditInfo({
+          available: creditRes.data.credit.credit_available,
+          limit: creditRes.data.credit.credit_limit,
+          used: creditRes.data.credit.credit_used
+        });
+      }
+    } catch (error: any) {
+      console.error('Failed to load credit info:', error);
     }
 
     setLoading(false);
@@ -161,8 +179,12 @@ const AddStockPage: React.FC = () => {
   const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleCheckout = () => {
-    if (cartTotal > capitalWalletBalance) {
+    if (paymentMethod === 'wallet' && cartTotal > capitalWalletBalance) {
       message.error('Insufficient Capital Wallet balance for this order');
+      return;
+    }
+    if (paymentMethod === 'credit' && (!creditInfo || cartTotal > creditInfo.available)) {
+      message.error('Insufficient Credit Limit for this order');
       return;
     }
     setCheckoutModalVisible(true);
@@ -180,7 +202,8 @@ const AddStockPage: React.FC = () => {
 
       const response = await retailerApi.createOrder({
         items: orderItems,
-        totalAmount: cartTotal
+        totalAmount: cartTotal,
+        paymentMethod: paymentMethod
       });
 
       const orderId = response.data.order.id;
@@ -378,8 +401,8 @@ const AddStockPage: React.FC = () => {
 
       {canBuy && (
         <Alert
-          message="Capital Wallet Payment Only"
-          description="All orders from your linked wholesaler are paid exclusively from your Capital Wallet balance. No other payment methods accepted."
+          message="Multi-payment Methods Available"
+          description="You can now pay for your stock orders using Capital Wallet, Wholesaler Credit, or Mobile Money."
           type="info"
           showIcon
           icon={<DollarOutlined />}
@@ -486,25 +509,48 @@ const AddStockPage: React.FC = () => {
                   </Text>
                 </Row>
 
-                {cartTotal > capitalWalletBalance && (
+                <Divider style={{ margin: '12px 0' }} />
+                <Text strong>Payment Method:</Text>
+                <Select 
+                  value={paymentMethod} 
+                  onChange={setPaymentMethod} 
+                  style={{ width: '100%', marginTop: 8, marginBottom: 16 }}
+                >
+                  <Select.Option value="wallet">Capital Wallet ({capitalWalletBalance.toLocaleString()} RWF)</Select.Option>
+                  {creditInfo && creditInfo.limit > 0 && (
+                    <Select.Option value="credit">Wholesaler Credit ({creditInfo.available.toLocaleString()} RWF available)</Select.Option>
+                  )}
+                  <Select.Option value="momo">Mobile Money (External Payment)</Select.Option>
+                </Select>
+
+                {(paymentMethod === 'wallet' && cartTotal > capitalWalletBalance) ? (
                   <Alert
-                    message="Insufficient Balance"
-                    description={`Your Capital Wallet balance (${capitalWalletBalance.toLocaleString()} RWF) is less than the order total.`}
+                    message="Insufficient Wallet Balance"
                     type="error"
                     showIcon
                     style={{ marginBottom: 16 }}
                   />
-                )}
+                ) : (paymentMethod === 'credit' && creditInfo && cartTotal > creditInfo.available) ? (
+                  <Alert
+                    message="Insufficient Credit Limit"
+                    type="error"
+                    showIcon
+                    style={{ marginBottom: 16 }}
+                  />
+                ) : null}
 
                 <Button
                   type="primary"
                   size="large"
                   block
                   onClick={handleCheckout}
-                  disabled={cartTotal > capitalWalletBalance}
+                  disabled={
+                    (paymentMethod === 'wallet' && cartTotal > capitalWalletBalance) ||
+                    (paymentMethod === 'credit' && (!creditInfo || cartTotal > creditInfo.available))
+                  }
                   icon={<CheckCircleOutlined />}
                 >
-                  Place Order from Capital Wallet
+                  Place Order ({paymentMethod.toUpperCase()})
                 </Button>
               </>
             )}
@@ -521,8 +567,14 @@ const AddStockPage: React.FC = () => {
         width={500}
       >
         <Alert
-          message="Payment from Capital Wallet"
-          description="This order will be paid from your Capital Wallet balance."
+          message={`Payment Method: ${paymentMethod.toUpperCase()}`}
+          description={
+            paymentMethod === 'wallet' 
+              ? "This order will be deducted from your Capital Wallet balance."
+              : paymentMethod === 'credit'
+              ? "This order will be added to your outstanding credit with the wholesaler."
+              : "Please follow the Mobile Money prompt on your phone after confirmation."
+          }
           type="info"
           showIcon
           style={{ marginBottom: 24 }}
@@ -544,18 +596,46 @@ const AddStockPage: React.FC = () => {
               {cartTotal.toLocaleString()} RWF
             </Text>
           </Row>
-          <Row justify="space-between">
-            <Text>Capital Wallet Balance:</Text>
-            <Text strong style={{ color: '#722ed1' }}>
-              {capitalWalletBalance.toLocaleString()} RWF
-            </Text>
-          </Row>
-          <Row justify="space-between">
-            <Text>Balance After Order:</Text>
-            <Text strong style={{ color: '#52c41a' }}>
-              {(capitalWalletBalance - cartTotal).toLocaleString()} RWF
-            </Text>
-          </Row>
+          {paymentMethod === 'wallet' && (
+            <>
+              <Row justify="space-between">
+                <Text>Capital Wallet Balance:</Text>
+                <Text strong style={{ color: '#722ed1' }}>
+                  {capitalWalletBalance.toLocaleString()} RWF
+                </Text>
+              </Row>
+              <Row justify="space-between">
+                <Text>Balance After Order:</Text>
+                <Text strong style={{ color: '#52c41a' }}>
+                  {(capitalWalletBalance - cartTotal).toLocaleString()} RWF
+                </Text>
+              </Row>
+            </>
+          )}
+          {paymentMethod === 'credit' && creditInfo && (
+            <>
+              <Row justify="space-between">
+                <Text>Available Credit:</Text>
+                <Text strong style={{ color: '#722ed1' }}>
+                  {creditInfo.available.toLocaleString()} RWF
+                </Text>
+              </Row>
+              <Row justify="space-between">
+                <Text>Remaining Credit:</Text>
+                <Text strong style={{ color: '#d48806' }}>
+                  {(creditInfo.available - cartTotal).toLocaleString()} RWF
+                </Text>
+              </Row>
+            </>
+          )}
+          {paymentMethod === 'momo' && (
+            <Row justify="space-between">
+              <Text>Amount to Pay:</Text>
+              <Text strong style={{ color: '#1890ff' }}>
+                {cartTotal.toLocaleString()} RWF
+              </Text>
+            </Row>
+          )}
         </Space>
 
         <Divider />

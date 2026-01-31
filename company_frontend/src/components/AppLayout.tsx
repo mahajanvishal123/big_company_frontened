@@ -53,6 +53,7 @@ const menuItems: Record<UserRole, { key: string; icon: React.ReactNode; label: s
     { key: 'add-stock', icon: <ShoppingCartOutlined />, label: 'Add Stock', path: '/retailer/add-stock', mobileLabel: 'Add Stock' },
     { key: 'inventory', icon: <InboxOutlined />, label: 'Inventory', path: '/retailer/inventory', mobileLabel: 'Stock' },
     { key: 'orders', icon: <ShoppingCartOutlined />, label: 'Orders', path: '/retailer/orders', mobileLabel: 'Orders' },
+    { key: 'purchase-orders', icon: <InboxOutlined />, label: 'Stock Orders', path: '/retailer/purchase-orders', mobileLabel: 'Wholesale' },
     { key: 'customer-requests', icon: <UserAddOutlined />, label: 'Customer Requests', path: '/retailer/customer-requests', mobileLabel: 'Customers' },
     { key: 'wholesalers', icon: <TeamOutlined />, label: 'Find Wholesaler', path: '/retailer/wholesalers', mobileLabel: 'Wholesalers' },
     { key: 'wallet', icon: <DollarOutlined />, label: 'Wallet & Credit', path: '/retailer/wallet', mobileLabel: 'Wallet' },

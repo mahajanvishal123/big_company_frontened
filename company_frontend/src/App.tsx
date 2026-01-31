@@ -38,6 +38,7 @@ import ManagementPage from './pages/retailer/ManagementPage';
 import RetailerAnalyticsPage from './pages/retailer/AnalyticsPage';
 import WholesalerDiscoveryPage from './pages/retailer/WholesalerDiscoveryPage';
 import CustomerLinkRequestsPage from './pages/retailer/CustomerLinkRequestsPage';
+import PurchaseOrdersPage from './pages/retailer/PurchaseOrdersPage'; // Add this
 
 // Wholesaler Pages
 import { WholesalerDashboard } from './pages/wholesaler/WholesalerDashboard';
@@ -151,6 +152,7 @@ function App() {
               <Route path="add-stock" element={<AddStockPage />} />
               <Route path="inventory" element={<RetailerInventoryPage />} />
               <Route path="orders" element={<RetailerOrdersPage />} />
+              <Route path="purchase-orders" element={<PurchaseOrdersPage />} />
               <Route path="wallet" element={<WalletPage />} />
               <Route path="management" element={<ManagementPage />} />
               <Route path="analytics" element={<RetailerAnalyticsPage />} />
