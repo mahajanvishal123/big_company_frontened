@@ -107,7 +107,7 @@ export const GasPage: React.FC = () => {
   const [selectedMeter, setSelectedMeter] = useState<GasMeter | null>(null);
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<number | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money' | 'nfc_card'>('wallet');
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money'>('wallet');
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [topupResult, setTopupResult] = useState<any>(null);
   const [safetyChecking, setSafetyChecking] = useState<string | null>(null);
@@ -269,10 +269,7 @@ export const GasPage: React.FC = () => {
       return;
     }
 
-    if (paymentMethod === 'nfc_card' && !selectedCardId) {
-      message.error('Please select an NFC Card for payment');
-      return;
-    }
+
 
     setProcessing(true);
     try {
@@ -287,8 +284,7 @@ export const GasPage: React.FC = () => {
         const result = response.data.data;
         const methodLabels = {
           wallet: 'Dashboard Balance',
-          mobile_money: 'Mobile Money',
-          nfc_card: 'NFC Card'
+          mobile_money: 'Mobile Money'
         };
 
         setTopupResult({
@@ -312,7 +308,7 @@ export const GasPage: React.FC = () => {
 
   const handleViewUsage = (meter: GasMeter) => {
     setSelectedMeterForUsage(meter);
-    
+
     // Transform history to show consumption as well
     const usageData = history
       .filter(h => h.meter_number === meter.meter_number)
@@ -323,7 +319,7 @@ export const GasPage: React.FC = () => {
         type: h.amount === 0 ? 'usage' as const : 'topup' as const,
         units: Math.abs(Number(h.units_purchased))
       }));
-    
+
     setUsageHistory(usageData);
     setShowUsageHistory(true);
   };
@@ -333,20 +329,20 @@ export const GasPage: React.FC = () => {
       message.error('Low gas! Please top up before cooking.');
       return;
     }
-    
+
     setSimulating(meter.id);
     message.loading({ content: 'Cooking started...', key: 'sim_usage' });
-    
+
     try {
       const response = await consumerApi.recordGasUsage({
         meter_number: meter.meter_number,
         units_used: 0.10,
         activity: 'Cooking Session'
       });
-      
+
       if (response.data.success) {
         setTimeout(() => {
-          message.success({ content: 'Yum! Cooking completed. 0.10 kg used.', key: 'sim_usage', icon: <FireOutlined style={{color: '#ff4d4f'}} />, duration: 3 });
+          message.success({ content: 'Yum! Cooking completed. 0.10 kg used.', key: 'sim_usage', icon: <FireOutlined style={{ color: '#ff4d4f' }} />, duration: 3 });
           setSimulating(null);
           fetchData();
         }, 1500);
@@ -659,10 +655,10 @@ export const GasPage: React.FC = () => {
                           </Text>
                         </span>
                         <Tooltip title="Verify Meter Health & Safety">
-                          <Button 
-                            size="small" 
-                            ghost 
-                            icon={<CheckCircleOutlined />} 
+                          <Button
+                            size="small"
+                            ghost
+                            icon={<CheckCircleOutlined />}
                             loading={safetyChecking === meter.id}
                             onClick={() => handleSafetyCheck(meter.id)}
                             style={{ fontSize: 10, height: 22, borderColor: 'rgba(255,255,255,0.5)' }}
@@ -677,7 +673,7 @@ export const GasPage: React.FC = () => {
                           {meter.phone_number}
                         </Text>
                       </div>
-                    <div style={{ marginTop: 8, padding: '8px', background: 'rgba(255,255,255,0.15)', borderRadius: 6 }}>
+                      <div style={{ marginTop: 8, padding: '8px', background: 'rgba(255,255,255,0.15)', borderRadius: 6 }}>
                         <Row align="middle" gutter={8}>
                           <Col span={12}>
                             <Text style={{ color: 'white', display: 'block', fontSize: 10 }}>UNITS LEFT</Text>
@@ -776,10 +772,10 @@ export const GasPage: React.FC = () => {
               placeholder="Enter meter ID (e.g., MTR-001234)"
               size="large"
               suffix={
-                <Button 
-                  type="text" 
-                  size="small" 
-                  icon={<HistoryOutlined />} 
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<HistoryOutlined />}
                   onClick={() => addMeterForm.setFieldsValue({ meter_number: generateMeterId() })}
                   title="Generate New ID"
                 />
@@ -940,9 +936,9 @@ export const GasPage: React.FC = () => {
                           <br />
                           <Text type="secondary">Available: {formatPrice(balance)}</Text>
                           {balance < (selectedAmount || 300) && (
-                            <Button 
-                              type="link" 
-                              size="small" 
+                            <Button
+                              type="link"
+                              size="small"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleMockTopup();
@@ -968,46 +964,12 @@ export const GasPage: React.FC = () => {
                       </Space>
                     </Card>
                   </Radio>
-                  <Radio value="nfc_card" style={{ width: '100%' }}>
-                    <Card size="small" style={{ margin: '8px 0' }}>
-                      <Space>
-                        <IdcardOutlined style={{ fontSize: 24, color: '#722ed1' }} />
-                        <div>
-                          <Text strong>NFC Card</Text>
-                          <br />
-                          <Text type="secondary">Pay with your linked card</Text>
-                        </div>
-                      </Space>
-                    </Card>
-                  </Radio>
+
                 </Space>
               </Radio.Group>
             </Form.Item>
 
-            {/* NFC Card Selection */}
-            {paymentMethod === 'nfc_card' && (
-              <Form.Item 
-                label="Select NFC Card" 
-                required
-                help={selectedCardId ? `Card Balance: ${formatPrice(nfcCards.find(c => c.id === selectedCardId)?.balance || 0)}` : ''}
-              >
-                <Select
-                  placeholder="Choose a card"
-                  size="large"
-                  onChange={(val) => setSelectedCardId(val)}
-                  value={selectedCardId}
-                >
-                  {nfcCards.map(card => (
-                    <Select.Option key={card.id} value={card.id}>
-                      {card.nickname} ({card.card_number}) - {formatPrice(card.balance)}
-                    </Select.Option>
-                  ))}
-                  {nfcCards.length === 0 && (
-                     <Select.Option disabled value="none">No cards linked</Select.Option>
-                  )}
-                </Select>
-              </Form.Item>
-            )}
+
 
             {/* Mobile Money Fields */}
             {paymentMethod === 'mobile_money' && (

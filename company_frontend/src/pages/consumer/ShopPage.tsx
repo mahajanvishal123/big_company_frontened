@@ -45,7 +45,7 @@ import {
   SendOutlined,
 } from '@ant-design/icons';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { consumerApi, nfcApi } from '../../services/apiService';
+import { consumerApi } from '../../services/apiService';
 import { useCart, Retailer } from '../../contexts/CartContext';
 
 const { Title, Text, Paragraph } = Typography;
@@ -114,7 +114,7 @@ export const ShopPage: React.FC = () => {
   // NEW: Track if user can buy (linked to this retailer)
   const [canBuy, setCanBuy] = useState(false);
   const [isLinked, setIsLinked] = useState(false);
-  const [viewingRetailerInfo, setViewingRetailerInfo] = useState<{id: number, shopName: string, address: string} | null>(null);
+  const [viewingRetailerInfo, setViewingRetailerInfo] = useState<{ id: number, shopName: string, address: string } | null>(null);
 
   const [customerLocation, setCustomerLocation] = useState<CustomerLocation | null>(() => {
     try {
@@ -128,28 +128,39 @@ export const ShopPage: React.FC = () => {
   const [showLocationModal, setShowLocationModal] = useState(!customerLocation);
   const [locationForm] = Form.useForm();
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money' | 'nfc_card'>('wallet');
-  const [nfcCards, setNfcCards] = useState<any[]>([]);
+  // Payment Selection State
+  const [paymentCategory, setPaymentCategory] = useState<'big_wallet' | 'mobile_money' | null>('big_wallet');
+  const [paymentSubOption, setPaymentSubOption] = useState<'dashboard' | 'credit' | 'mtn' | 'airtel'>('dashboard');
+
+  const [gasRewardWalletId, setGasRewardWalletId] = useState<string | null>(null);
   const [checkoutForm] = Form.useForm();
   const [processingPayment, setProcessingPayment] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
 
   const formatPrice = (amount: number) => `${amount.toLocaleString()} RWF`;
 
+  // Set gas reward wallet ID when checkout modal opens, only for Dashboard Wallet
+  useEffect(() => {
+    if (showCheckoutModal) {
+      // Only pre-fill for Dashboard Wallet, leave empty for Mobile Money
+      if (paymentCategory === 'big_wallet' && paymentSubOption === 'dashboard' && gasRewardWalletId) {
+        checkoutForm.setFieldsValue({ gasRewardWalletId });
+      } else if (paymentCategory === 'mobile_money') {
+        // Don't auto-fill for mobile money - leave it empty
+        checkoutForm.setFieldsValue({ gasRewardWalletId: '' });
+      }
+    }
+  }, [showCheckoutModal, paymentCategory, paymentSubOption, gasRewardWalletId, checkoutForm]);
 
 
   useEffect(() => {
     const init = async () => {
       try {
-        const [c, profileRes, cardsRes] = await Promise.all([
+        const [c, profileRes] = await Promise.all([
           consumerApi.getCategories(),
-          consumerApi.getProfile(),
-          nfcApi.getMyCards()
+          consumerApi.getProfile()
         ]);
         setCategories(c.data.categories || []);
-        if (cardsRes.data.success) {
-          setNfcCards(cardsRes.data.data || []);
-        }
 
         let currentLocation = customerLocation;
 
@@ -180,7 +191,11 @@ export const ShopPage: React.FC = () => {
             isLinked: true
           }));
           setRetailers(linked);
-          
+
+          if (profileRes.data.success) {
+            setGasRewardWalletId(profileRes.data.data.gas_reward_wallet_id);
+          }
+
           // Auto-show modal if not already viewing a specific retailer
           if (!selectedRetailer && !urlRetailerId && linked.length > 0) {
             setShowRetailerModal(true);
@@ -194,25 +209,25 @@ export const ShopPage: React.FC = () => {
             sector: currentLocation.sector,
             cell: currentLocation.cell
           });
-          
+
           const nearby = response.data.retailers?.map((r: any) => ({
-             id: r.id,
-             name: r.shopName,
-             location: r.address,
-             image: r.image,
-             isLinked: r.requestStatus === 'approved'
+            id: r.id,
+            name: r.shopName,
+            location: r.address,
+            image: r.image,
+            isLinked: r.requestStatus === 'approved'
           })) || [];
 
           setRetailers(prev => {
-             // Merge lists, avoiding duplicates
-             const ids = new Set(prev.map(p => p.id));
-             const combined = [...prev];
-             nearby.forEach((n: any) => {
-                if (!ids.has(n.id)) {
-                   combined.push(n);
-                }
-             });
-             return combined;
+            // Merge lists, avoiding duplicates
+            const ids = new Set(prev.map(p => p.id));
+            const combined = [...prev];
+            nearby.forEach((n: any) => {
+              if (!ids.has(n.id)) {
+                combined.push(n);
+              }
+            });
+            return combined;
           });
         }
       } catch (error) {
@@ -263,12 +278,12 @@ export const ShopPage: React.FC = () => {
   const handleLocationSubmit = async (v: CustomerLocation) => {
     setCustomerLocation(v);
     localStorage.setItem('bigcompany_location', JSON.stringify(v));
-    
+
     setLoading(true);
     try {
       // Formatted address for database
       const addressString = `${v.cell}, ${v.sector}, ${v.district}`;
-      
+
       // Save to database
       await consumerApi.updateProfile({ address: addressString });
 
@@ -331,6 +346,15 @@ export const ShopPage: React.FC = () => {
     if (!selectedRetailer) return;
     setProcessingPayment(true);
     try {
+      // Map UI selection to Backend Payment Method
+      let backendPaymentMethod = 'wallet'; // Default
+      if (paymentCategory === 'big_wallet') {
+        if (paymentSubOption === 'dashboard') backendPaymentMethod = 'wallet';
+        if (paymentSubOption === 'credit') backendPaymentMethod = 'credit_wallet';
+      } else if (paymentCategory === 'mobile_money') {
+        backendPaymentMethod = 'mobile_money';
+      }
+
       const payload = {
         retailerId: selectedRetailer.id,
         items: cartItems.map(item => ({
@@ -338,10 +362,13 @@ export const ShopPage: React.FC = () => {
           quantity: item.quantity,
           price: item.price
         })),
-        paymentMethod: paymentMethod, 
-        cardId: values.cardId,
-        meterId: values.meterId, // Added Meter ID
-        total: cartTotal
+        paymentMethod: backendPaymentMethod,
+        meterId: values.gasRewardWalletId,
+        gasRewardWalletId: gasRewardWalletId,
+        total: cartTotal,
+        metadata: {
+          provider: paymentCategory === 'mobile_money' ? paymentSubOption : undefined
+        }
       };
 
       const response = await consumerApi.createOrder(payload);
@@ -409,9 +436,9 @@ export const ShopPage: React.FC = () => {
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
                 <Text style={{ opacity: 0.8, fontWeight: 700 }}>WELCOME BACK, {user?.name?.toUpperCase() || 'USER'}</Text>
                 {customerLocation && (
-                  <Button 
-                    size="small" 
-                    icon={<EnvironmentOutlined />} 
+                  <Button
+                    size="small"
+                    icon={<EnvironmentOutlined />}
                     onClick={() => setShowLocationModal(true)}
                     style={{ background: 'rgba(255,255,255,0.15)', color: 'white', border: 'none', borderRadius: 8 }}
                   >
@@ -585,45 +612,113 @@ export const ShopPage: React.FC = () => {
           {paymentSuccess ? <div style={{ textAlign: 'center', padding: 40 }}><CheckCircleOutlined style={{ fontSize: 64, color: '#10b981' }} /><Title level={3}>Success!</Title></div> : (
             <Form layout="vertical" onFinish={handlePaymentSubmit} form={checkoutForm}>
               <Card style={{ marginBottom: 24, background: '#f0fdf4', border: 'none' }}><Text type="secondary">Total</Text><Title level={2} style={{ margin: 0, color: '#10b981' }}>{formatPrice(cartTotal)}</Title></Card>
-              <Form.Item label="Payment Method" name="paymentMethod_ignore">
-                <Radio.Group value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
-                  <Radio value="wallet">BIG Wallet</Radio>
-                  <Radio value="nfc_card">NFC Card</Radio>
-                  <Radio value="mobile_money">Mobile Money</Radio>
-                </Radio.Group>
+              <Form.Item label="Payment Method" style={{ marginBottom: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
+                  {/* BIG Wallet Group */}
+                  <Card
+                    size="small"
+                    style={{
+                      borderColor: paymentCategory === 'big_wallet' ? '#10b981' : '#f0f0f0',
+                      background: paymentCategory === 'big_wallet' ? '#f6ffed' : '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => { setPaymentCategory('big_wallet'); setPaymentSubOption('dashboard'); }}
+                  >
+                    <Radio checked={paymentCategory === 'big_wallet'}>
+                      <Text strong>BIG Wallet</Text>
+                    </Radio>
+                    {paymentCategory === 'big_wallet' && (
+                      <div style={{ paddingLeft: 28, marginTop: 12 }}>
+                        <Radio.Group value={paymentSubOption} onChange={e => setPaymentSubOption(e.target.value)}>
+                          <Space direction="vertical">
+                            <Radio value="dashboard">Dashboard Wallet</Radio>
+                            <Radio value="credit">Credit Wallet</Radio>
+                          </Space>
+                        </Radio.Group>
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Mobile Money Group */}
+                  <Card
+                    size="small"
+                    style={{
+                      borderColor: paymentCategory === 'mobile_money' ? '#10b981' : '#f0f0f0',
+                      background: paymentCategory === 'mobile_money' ? '#f6ffed' : '#ffffff',
+                      cursor: 'pointer'
+                    }}
+                    onClick={() => { setPaymentCategory('mobile_money'); setPaymentSubOption('mtn'); }}
+                  >
+                    <Radio checked={paymentCategory === 'mobile_money'}>
+                      <Text strong>Mobile Money</Text>
+                    </Radio>
+                    {paymentCategory === 'mobile_money' && (
+                      <div style={{ paddingLeft: 28, marginTop: 12 }}>
+                        <Radio.Group value={paymentSubOption} onChange={e => setPaymentSubOption(e.target.value)}>
+                          <Space direction="vertical">
+                            <Radio value="mtn">MTN Mobile Money</Radio>
+                            <Radio value="airtel">Airtel Money</Radio>
+                          </Space>
+                        </Radio.Group>
+                      </div>
+                    )}
+                  </Card>
+                </div>
               </Form.Item>
 
-              {['wallet', 'mobile_money'].includes(paymentMethod) && (
-                 <div style={{ marginBottom: 24, padding: 16, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
-                    <Text type="success" strong><StarFilled /> Earn Gas Rewards!</Text>
-                    <Paragraph style={{ margin: '8px 0', fontSize: 13 }}>
-                       Enter your Meter ID to receive 12% of the profit as gas units.
-                    </Paragraph>
-                    <Form.Item
-                        name="meterId"
-                        label="Gas Meter ID"
-                        rules={[{ required: true, message: 'Meter ID is required for rewards' }]}
-                        style={{ marginBottom: 0 }}
-                    >
-                        <Input placeholder="Enter Meter ID (e.g. MTR-12345)" prefix={<LockOutlined />} />
-                    </Form.Item>
-                 </div>
-              )}
-              
-              {paymentMethod === 'nfc_card' && (
-                <Form.Item 
-                  name="cardId" 
-                  label="Select Card" 
-                  rules={[{ required: true, message: 'Please select a card' }]}
+              {/* Mobile Money Phone Number Field */}
+              {paymentCategory === 'mobile_money' && paymentSubOption && (
+                <Form.Item
+                  name="mobileNumber"
+                  label="Mobile Number"
+                  rules={[
+                    { required: true, message: 'Please enter your mobile number' },
+                    { pattern: /^[0-9]{10}$/, message: 'Please enter a valid 10-digit mobile number' }
+                  ]}
                 >
-                  <Select placeholder="Choose NFC Card">
-                    {nfcCards.map(c => (
-                      <Option key={c.id} value={c.id}>
-                        {c.nickname || c.card_number} (Bal: {c.balance?.toLocaleString() || 0} RWF)
-                      </Option>
-                    ))}
-                  </Select>
+                  <Input
+                    placeholder="e.g., 0788123456"
+                    prefix={<PhoneOutlined />}
+                    maxLength={10}
+                  />
                 </Form.Item>
+              )}
+
+              {/* Logic Check: Hide Rewards for Credit Wallet */}
+              {!(paymentCategory === 'big_wallet' && paymentSubOption === 'credit') && (
+                <div style={{ marginBottom: 24, padding: 16, background: '#f6ffed', borderRadius: 8, border: '1px solid #b7eb8f' }}>
+                  <Text type="success" strong><StarFilled /> Earn Gas Rewards!</Text>
+                  <Paragraph style={{ margin: '8px 0', fontSize: 13 }}>
+                    Enter your Gas Reward Wallet ID to receive 12% of your purchase as gas units.
+                    {paymentCategory === 'mobile_money' && ' (Optional for Mobile Money)'}
+                  </Paragraph>
+                  <Form.Item
+                    name="gasRewardWalletId"
+                    label="Gas Reward Wallet ID"
+                    rules={[
+                      {
+                        required: paymentCategory === 'big_wallet' && paymentSubOption === 'dashboard',
+                        message: 'Gas Reward Wallet ID is required for Dashboard Wallet rewards'
+                      }
+                    ]}
+                    style={{ marginBottom: 0 }}
+                  >
+                    <Input
+                      placeholder={paymentCategory === 'mobile_money' ? 'Gas Reward Wallet ID (Optional - GRW-...)' : 'Gas Reward Wallet ID (GRW-...)'}
+                      prefix={<WalletOutlined />}
+                    />
+                  </Form.Item>
+                </div>
+              )}
+
+              {(paymentCategory === 'big_wallet' && paymentSubOption === 'credit') && (
+                <Alert
+                  message="No Rewards"
+                  description="Purchases made with Credit Wallet are not eligible for gas rewards."
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 24 }}
+                />
               )}
 
               <Button type="primary" htmlType="submit" block size="large" loading={processingPayment}>Pay Now</Button>
@@ -642,10 +737,10 @@ export const ShopPage: React.FC = () => {
                       <Col span={12}><Text strong>{item.name}</Text><div>{formatPrice(item.price)}</div></Col>
                       <Col span={5} style={{ textAlign: 'right' }}><Text strong>x{item.quantity}</Text></Col>
                       <Col span={3} style={{ textAlign: 'right' }}>
-                        <Button 
-                          type="text" 
-                          danger 
-                          icon={<DeleteOutlined />} 
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteOutlined />}
                           onClick={() => removeItem(item.productId)}
                         />
                       </Col>
@@ -656,7 +751,22 @@ export const ShopPage: React.FC = () => {
               <Divider />
               <div style={{ padding: 16 }}>
                 <Row justify="space-between" style={{ marginBottom: 16 }}><Text>Total</Text><Title level={4} style={{ margin: 0 }}>{formatPrice(cartTotal)}</Title></Row>
-                <Button type="primary" block size="large" onClick={() => { setShowCartDrawer(false); setShowCheckoutModal(true); }}>Checkout</Button>
+                <Button
+                  type="primary"
+                  block
+                  size="large"
+                  onClick={() => {
+                    if (!canBuy) {
+                      message.error('You must be approved by this retailer before placing orders. Please send a link request and wait for approval.');
+                      return;
+                    }
+                    setShowCartDrawer(false);
+                    setShowCheckoutModal(true);
+                  }}
+                  disabled={!canBuy}
+                >
+                  Checkout
+                </Button>
               </div>
             </div>
           )}

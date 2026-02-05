@@ -87,12 +87,12 @@ const RetailerDiscoveryPage: React.FC = () => {
   useEffect(() => {
     fetchRetailers();
     fetchMyRequests();
-  }, [search]);
+  }, [search, province, district, sector]);
 
   const fetchRetailers = async () => {
     // Only search if all location fields are present, OR if it's the initial load (optional)
     // But requirement says "Strict address based".
-    
+
     // Allow fetching all retailers by default (User request: "page per all retailers bhi dikhne chiye")
     /*
     if (!province || !district || !sector) {
@@ -104,16 +104,17 @@ const RetailerDiscoveryPage: React.FC = () => {
       setLoading(true);
       const response = await consumerApi.getRetailers({
         province,
-        district, 
+        district,
         sector
       });
       setRetailers(response.data.retailers || []);
+      console.log("Reatailers", response.data.retailers);
       setCurrentLinkedId(response.data.currentLinkedRetailerId || null);
     } catch (error: any) {
       if (error.response?.status === 404) {
-          setRetailers([]); // No stores found
+        setRetailers([]); // No stores found
       } else {
-          message.error('Failed to fetch retailers');
+        message.error('Failed to fetch retailers');
       }
     } finally {
       setLoading(false);
@@ -311,7 +312,7 @@ const RetailerDiscoveryPage: React.FC = () => {
             )}
 
             {/* CASE 4: No request yet - can send link request */}
-            {hasNoRequestToThisRetailer && (
+            {hasNoRequestToThisRetailer && !record.isLinked && (
               <Button
                 type="primary"
                 icon={<SendOutlined />}
@@ -361,8 +362,8 @@ const RetailerDiscoveryPage: React.FC = () => {
 
       {/* NEW: My Linked Retailers Section */}
       {linkedRetailers.length > 0 && (
-        <Card 
-          title={<><LinkOutlined /> My Linked Retailers</>} 
+        <Card
+          title={<><LinkOutlined /> My Linked Retailers</>}
           style={{ marginBottom: 24, border: '1px solid #52c41a' }}
         >
           <Table
@@ -391,9 +392,9 @@ const RetailerDiscoveryPage: React.FC = () => {
                 key: 'action',
                 align: 'right',
                 render: (_, record) => (
-                  <Button 
-                    type="primary" 
-                    icon={<ShoppingCartOutlined />} 
+                  <Button
+                    type="primary"
+                    icon={<ShoppingCartOutlined />}
                     onClick={() => navigate(`/consumer/shop?retailerId=${record.id}`)}
                   >
                     Shop Now
@@ -430,17 +431,31 @@ const RetailerDiscoveryPage: React.FC = () => {
         <Space direction="vertical" style={{ width: '100%', marginBottom: 16 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Title level={5}>Find Store by Location</Title>
-            <Button 
-               type="link" 
-               onClick={() => {
-                 setProvince(undefined);
-                 setDistrict(undefined);
-                 setSector(undefined);
-                 fetchRetailers();
-               }}
-            >
-               Show All Retailers
-            </Button>
+            <Space>
+              <Button
+                type="link"
+                icon={<SearchOutlined />}
+                onClick={() => {
+                  fetchRetailers();
+                  fetchLinkedRetailers();
+                  fetchMyRequests();
+                  message.success('Refreshed retailer list');
+                }}
+              >
+                Refresh
+              </Button>
+              <Button
+                type="link"
+                onClick={() => {
+                  setProvince(undefined);
+                  setDistrict(undefined);
+                  setSector(undefined);
+                  fetchRetailers();
+                }}
+              >
+                Show All Retailers
+              </Button>
+            </Space>
           </div>
           <Space wrap>
             <Select
@@ -466,8 +481,8 @@ const RetailerDiscoveryPage: React.FC = () => {
               style={{ width: 200 }}
               disabled={!province}
               onChange={(value) => {
-                 setDistrict(value);
-                 setSector(undefined);
+                setDistrict(value);
+                setSector(undefined);
               }}
               value={district}
               allowClear
@@ -479,35 +494,35 @@ const RetailerDiscoveryPage: React.FC = () => {
                   <Select.Option value="Nyarugenge">Nyarugenge</Select.Option>
                 </>
               )}
-               {province && province !== 'Kigali' && (
-                 <Select.Option value="Demo District">Demo District</Select.Option>
-               )}
+              {province && province !== 'Kigali' && (
+                <Select.Option value="Demo District">Demo District</Select.Option>
+              )}
             </Select>
 
-             <Input 
-                placeholder="Enter Sector" 
-                style={{ width: 200 }} 
-                disabled={!district}
-                value={sector}
-                onChange={(e) => setSector(e.target.value)}
-             />
+            <Input
+              placeholder="Enter Sector"
+              style={{ width: 200 }}
+              disabled={!district}
+              value={sector}
+              onChange={(e) => setSector(e.target.value)}
+            />
 
-            <Button 
-                type="primary" 
-                icon={<SearchOutlined />} 
-                onClick={fetchRetailers}
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={fetchRetailers}
             >
               Find Stores
             </Button>
-            
+
             <Button onClick={() => {
-                setProvince(undefined);
-                setDistrict(undefined);
-                setSector(undefined);
-                setRetailers([]);
-                fetchRetailers();
+              setProvince(undefined);
+              setDistrict(undefined);
+              setSector(undefined);
+              setRetailers([]);
+              fetchRetailers();
             }}>
-                Clear
+              Clear
             </Button>
           </Space>
         </Space>
@@ -521,10 +536,10 @@ const RetailerDiscoveryPage: React.FC = () => {
         ) : (
           retailers.length > 0 && (
             <Table
-                columns={columns}
-                dataSource={retailers}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
+              columns={columns}
+              dataSource={retailers}
+              rowKey="id"
+              pagination={{ pageSize: 10 }}
             />
           )
         )}

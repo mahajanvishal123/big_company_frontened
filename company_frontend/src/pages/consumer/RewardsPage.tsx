@@ -18,6 +18,9 @@ import {
   Alert,
   Statistic,
   Divider,
+  Modal,
+  Form,
+  InputNumber,
 } from 'antd';
 import {
   GiftOutlined,
@@ -36,6 +39,7 @@ import {
   CommentOutlined,
   UserAddOutlined,
   LinkOutlined,
+  SendOutlined,
 } from '@ant-design/icons';
 import { consumerApi } from '../../services/apiService';
 
@@ -72,9 +76,13 @@ interface LeaderboardEntry {
 }
 
 
-const transactionTypeConfig = {
+const transactionTypeConfig: any = {
   earned: { color: 'success', icon: '+', label: 'Earned' },
+  purchase: { color: 'success', icon: '+', label: 'Purchase Reward' },
   redeemed: { color: 'processing', icon: '-', label: 'Redeemed' },
+  redemption: { color: 'processing', icon: '-', label: 'Redeemed' },
+  sent: { color: 'warning', icon: '-', label: 'Sent to Meter' },
+  order_payment: { color: 'orange', icon: '-', label: 'Order Payment' },
   expired: { color: 'error', icon: '-', label: 'Expired' },
   bonus: { color: 'purple', icon: '+', label: 'Bonus' },
   referral: { color: 'orange', icon: '+', label: 'Referral' },
@@ -90,6 +98,9 @@ export const RewardsPage: React.FC = () => {
   const [redeeming, setRedeeming] = useState(false);
   const [redeemAmount, setRedeemAmount] = useState('');
   const [copied, setCopied] = useState(false);
+
+  const [sendToMeterModalVisible, setSendToMeterModalVisible] = useState(false);
+  const [sendToMeterForm] = Form.useForm();
 
   useEffect(() => {
     fetchData();
@@ -115,24 +126,18 @@ export const RewardsPage: React.FC = () => {
       }
 
       // Transform history: map units to points and add metadata
-      if (historyRes.data.success) {
-        const transformedTransactions: RewardTransaction[] = historyRes.data.data.map((item: any) => {
-          const points = Math.round(Math.abs(item.units) * 100);
-          const isPositive = item.units > 0;
-
+      if (historyRes.data.success && historyRes.data.data.transactions) {
+        const transformedTransactions: RewardTransaction[] = historyRes.data.data.transactions.map((item: any) => {
           return {
             id: item.id,
-            type: item.source === 'redemption' ? 'redeemed' :
-              item.source === 'referral' ? 'referral' :
-                item.source === 'bonus' ? 'bonus' : 'earned',
-            points: points,
-            description: item.source === 'purchase' ? 'Shopping rewards' :
-              item.source === 'redemption' ? item.reference :
-                item.reference || 'Gas reward',
+            type: item.type || 'earned',
+            points: item.points || 0, // Keep original sign
+            description: item.description || 'Gas reward',
             created_at: item.created_at,
-            meter_id: item.metadata?.meter_id,
-            order_amount: item.metadata?.order_amount,
-            order_id: item.metadata?.order_id || item.reference,
+            meter_id: item.meter_id,
+            order_amount: item.order_amount,
+            order_id: item.order_id,
+            metadata: item.metadata
           };
         });
         setTransactions(transformedTransactions);
@@ -227,6 +232,27 @@ export const RewardsPage: React.FC = () => {
     }
   };
 
+  const handleSendToMeter = async (values: any) => {
+    try {
+      setRedeeming(true);
+      const response = await consumerApi.sendToMeter({
+        meterId: values.meterId,
+        amount: values.amount // Amount in m3
+      });
+
+      if (response.data.success) {
+        message.success(response.data.message || 'Sent successfully!');
+        setSendToMeterModalVisible(false);
+        sendToMeterForm.resetFields();
+        await fetchData();
+      }
+    } catch (error: any) {
+      message.error(error.response?.data?.error || 'Failed to send rewards');
+    } finally {
+      setRedeeming(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-RW', {
@@ -264,16 +290,26 @@ export const RewardsPage: React.FC = () => {
       dataIndex: 'points',
       key: 'points',
       render: (points: number, record: RewardTransaction) => {
-        const isPositive = ['earned', 'bonus', 'referral'].includes(record.type);
-        const gasAmount = (points * 0.01).toFixed(2);
-        return (
-          <Text strong style={{ color: isPositive ? '#52c41a' : '#ff4d4f' }}>
-            {isPositive ? '+' : '-'}
-            {gasAmount} M³
-          </Text>
-        );
+        const isPositive = ['earned', 'bonus', 'referral', 'refund'].includes(record.type) || (record.type as any) === 'sent' ? false : true;
+        // Logic fix: Sent = negative. Earned = positive.
+        // My transform logic in fetchData: points = abs(units)*100.
+        // And isPositive = units > 0.
+        // So I should just check if units > 0 from raw data... but I don't have raw here. I have points (positive).
+        // Wait, I should rely on 'type'.
+        // Backend types: 'purchase', 'redemption', 'bonus', 'referral', 'sent'.
+        // My frontend types: 'earned', 'redeemed', 'expired', 'bonus', 'referral'.
+        // I need to add 'sent' to frontend types.
+        return null; // Logic is handled in render below
       },
-      width: 130,
+      // ... I'll use the existing render logic which was:
+      // render: (points: number, record: RewardTransaction) => {
+      //   const isPositive = ['earned', 'bonus', 'referral'].includes(record.type);
+      //   // ...
+      // }
+      // I need to ensure 'sent' is handled as negative.
+      // But fetchData maps 'sent' to... what?
+      // "item.source === 'redemption' ? 'redeemed' ..."
+      // I need to update fetchData mapping too.
     },
     {
       title: 'Order ID',
@@ -287,6 +323,28 @@ export const RewardsPage: React.FC = () => {
       width: 130,
     },
   ];
+
+  // Custom render for columns to handle types better
+  const renderAmount = (points: number, record: RewardTransaction) => {
+    const isPositive = points >= 0;
+    const gasAmount = (Math.abs(points) * 0.01).toFixed(2);
+    return (
+      <Text strong style={{ color: isPositive ? '#52c41a' : '#ff4d4f' }}>
+        {isPositive ? '+' : '-'}
+        {gasAmount} M³
+      </Text>
+    );
+  };
+
+  // Overwriting columns to use renderAmount
+  const columnsWithRender = [
+    transactionColumns[0],
+    transactionColumns[1],
+    transactionColumns[2],
+    { ...transactionColumns[3], render: renderAmount },
+    transactionColumns[4]
+  ];
+
 
   if (loading) {
     return (
@@ -330,9 +388,19 @@ export const RewardsPage: React.FC = () => {
               <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
                 Available Gas Rewards
               </Text>
-              <Title level={2} style={{ color: 'white', margin: '8px 0 0 0' }}>
-                {((balance?.points || 0) * 0.01).toFixed(2)} M³
-              </Title>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 16 }}>
+                <Title level={2} style={{ color: 'white', margin: '8px 0 0 0' }}>
+                  {((balance?.points || 0) * 0.01).toFixed(2)} M³
+                </Title>
+                <Button
+                  type="primary"
+                  icon={<SendOutlined />}
+                  onClick={() => setSendToMeterModalVisible(true)}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none' }}
+                >
+                  Send to Meter
+                </Button>
+              </div>
               <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 12 }}>
                 Cubic Meters
               </Text>
@@ -530,7 +598,7 @@ export const RewardsPage: React.FC = () => {
           >
             <Table
               dataSource={transactions}
-              columns={transactionColumns}
+              columns={columnsWithRender}
               rowKey="id"
               pagination={{ pageSize: 10 }}
               locale={{
@@ -550,6 +618,20 @@ export const RewardsPage: React.FC = () => {
 
         </Tabs>
       </Card>
+
+      {/* Send to Meter Modal */}
+      <Modal title="Send Gas Rewards to Meter" open={sendToMeterModalVisible} onCancel={() => setSendToMeterModalVisible(false)} footer={null}>
+        <Form form={sendToMeterForm} onFinish={handleSendToMeter} layout="vertical">
+          <Alert message={`Available Balance: ${((balance?.points || 0) * 0.01).toFixed(2)} M³`} type="info" showIcon style={{ marginBottom: 16 }} />
+          <Form.Item name="meterId" label="Recipient Meter Number (or ID)" rules={[{ required: true }]}>
+            <Input placeholder="Enter meter number" />
+          </Form.Item>
+          <Form.Item name="amount" label="Amount (M³)" rules={[{ required: true }]}>
+            <InputNumber style={{ width: '100%' }} step={0.01} min={0.01} max={(balance?.points || 0) * 0.01} />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={redeeming} block>Send Now</Button>
+        </Form>
+      </Modal>
     </div>
   );
 };

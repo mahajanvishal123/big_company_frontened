@@ -127,6 +127,8 @@ export const consumerApi = {
     api.post("/store/rewards/apply-referral", { code }),
   getLeaderboard: (period: "week" | "month" | "all") =>
     api.get("/store/gas/rewards/leaderboard", { params: { period } }),
+  sendToMeter: (data: { meterId: string; amount: number }) =>
+    api.post("/rewards/send-to-meter", data),
 
   // Loans
   getLoanProducts: () => api.get("/store/loans/products"),
@@ -143,10 +145,10 @@ export const consumerApi = {
   repayLoan: (id: string, data: { amount: number; payment_method: string }) =>
     api.post(`/store/loans/${id}/repay`, data),
   getFoodCredit: () => api.get("/store/loans/food-credit"),
-  
+
   // Profile
   getProfile: () => api.get("/store/customers/me"),
-  updateProfile: (data: { full_name?: string; address?: string; landmark?: string }) => 
+  updateProfile: (data: { full_name?: string; address?: string; landmark?: string }) =>
     api.put("/store/customers/me", data),
 };
 
@@ -213,9 +215,9 @@ export const retailerApi = {
   getWholesalers: () => api.get("/retailer/wholesalers"),
   getWholesalerProducts: (params?: any) =>
     api.get("/retailer/wholesaler/products", { params }), // Correct endpoint
-  getPurchaseOrders: (params?: any) => 
+  getPurchaseOrders: (params?: any) =>
     api.get("/retailer/wholesaler/orders", { params }),
-  getPurchaseOrder: (id: string) => 
+  getPurchaseOrder: (id: string) =>
     api.get(`/retailer/wholesaler/orders/${id}`),
 
   // Branch Management
