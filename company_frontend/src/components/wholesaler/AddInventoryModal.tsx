@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, Form, Input, InputNumber, Select, Row, Col, message } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, Row, Col, message, Upload } from 'antd';
+import { InboxOutlined } from '@ant-design/icons';
 import { wholesalerApi } from '../../services/apiService';
 
 interface AddInventoryModalProps {
@@ -31,6 +32,7 @@ export const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
     const [categories, setCategories] = useState<string[]>(defaultCategories);
+    const [fileList, setFileList] = useState<any[]>([]);
 
     useEffect(() => {
         if (open) {
@@ -54,10 +56,17 @@ export const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
             const values = await form.validateFields();
             setLoading(true);
 
+            // Add image to values if available
+            if (fileList.length > 0 && fileList[0].originFileObj) {
+                const base64 = await getBase64(fileList[0].originFileObj);
+                values.image = base64;
+            }
+
             await wholesalerApi.createProduct(values);
 
             message.success('Inventory added successfully');
             form.resetFields();
+            setFileList([]);
             onSuccess();
         } catch (error: any) {
             if (error.errorFields) return;
@@ -73,6 +82,7 @@ export const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
             open={open}
             onCancel={() => {
                 form.resetFields();
+                setFileList([]);
                 onCancel();
             }}
             onOk={handleSubmit}
@@ -215,7 +225,32 @@ export const AddInventoryModal: React.FC<AddInventoryModalProps> = ({
                 <Form.Item name="description" label="Description (Optional)">
                     <TextArea rows={3} placeholder="Enter product details..." />
                 </Form.Item>
+
+                <Form.Item label="Product Image">
+                    <Upload.Dragger
+                        listType="picture"
+                        fileList={fileList}
+                        beforeUpload={() => false}
+                        onChange={({ fileList }) => setFileList(fileList.slice(-1))}
+                        maxCount={1}
+                    >
+                        <p className="ant-upload-drag-icon">
+                            <InboxOutlined />
+                        </p>
+                        <p className="ant-upload-text">Click or drag image to this area to upload</p>
+                    </Upload.Dragger>
+                </Form.Item>
             </Form>
         </Modal>
     );
+};
+
+// Helper function to convert file to base64
+const getBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
 };

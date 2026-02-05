@@ -40,6 +40,7 @@ interface PurchaseOrderItem {
   quantity: number;
   price: number;
   total: number;
+  image?: string;
 }
 
 interface PurchaseOrder {
@@ -299,7 +300,26 @@ export const PurchaseOrdersPage = () => {
               pagination={false}
               size="small"
               columns={[
-                { title: 'Product', dataIndex: 'product_name', key: 'product_name' },
+                { 
+                  title: 'Product', 
+                  key: 'product',
+                  render: (_, record) => (
+                    <Space>
+                      {record.image ? (
+                        <img 
+                          src={record.image} 
+                          alt={record.product_name} 
+                          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} 
+                        />
+                      ) : (
+                        <div style={{ width: 40, height: 40, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ShoppingCartOutlined style={{ fontSize: 20, color: '#ccc' }} />
+                        </div>
+                      )}
+                      <Text strong>{record.product_name}</Text>
+                    </Space>
+                  )
+                },
                 { title: 'Price', dataIndex: 'price', key: 'price', render: (val) => `${val.toLocaleString()} RWF` },
                 { title: 'Qty', dataIndex: 'quantity', key: 'quantity' },
                 { title: 'Total', dataIndex: 'total', key: 'total', render: (val) => <Text strong>{val.toLocaleString()} RWF</Text> },

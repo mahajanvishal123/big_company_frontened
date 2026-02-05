@@ -19,6 +19,8 @@ import {
   Col,
   Statistic,
   Popconfirm,
+  Avatar,
+  Upload,
 } from 'antd';
 import {
   ReloadOutlined,
@@ -29,6 +31,7 @@ import {
   InboxOutlined,
   SearchOutlined,
   DeleteOutlined,
+  InboxOutlined as UploadIcon,
 } from '@ant-design/icons';
 import { wholesalerApi } from '../../services/apiService';
 import { AddInventoryModal } from '../../components/wholesaler/AddInventoryModal';
@@ -100,6 +103,7 @@ export const InventoryPage = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [form] = Form.useForm();
   const [actionLoading, setActionLoading] = useState(false);
+  const [fileList, setFileList] = useState<any[]>([]);
 
   const fetchProducts = async (showRefresh = false) => {
     if (showRefresh) setRefreshing(true);
@@ -176,11 +180,19 @@ export const InventoryPage = () => {
     try {
       const values = await form.validateFields();
       setActionLoading(true);
+
+      // Add image to values if available
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        const base64 = await getBase64(fileList[0].originFileObj);
+        values.image = base64;
+      }
+
       await wholesalerApi.updateProduct(selectedProduct.id, values);
       message.success('Product updated successfully');
       setEditModalOpen(false);
       setSelectedProduct(null);
       form.resetFields();
+      setFileList([]);
       fetchProducts(true);
     } catch (err: any) {
       if (err.errorFields) return;
@@ -269,7 +281,12 @@ export const InventoryPage = () => {
       title: 'Product',
       dataIndex: 'name',
       key: 'name',
-      render: (value: string) => <strong>{value}</strong>,
+      render: (value: string, record: Product) => (
+        <Space>
+          <Avatar src={record.image} shape="square" size={40} icon={<InboxOutlined />} />
+          <strong>{value}</strong>
+        </Space>
+      ),
     },
     {
       title: 'Category',
@@ -342,6 +359,16 @@ export const InventoryPage = () => {
             onClick={() => {
               setSelectedProduct(record);
               form.setFieldsValue(record);
+              if (record.image) {
+                setFileList([{
+                  uid: '-1',
+                  name: 'image.png',
+                  status: 'done',
+                  url: record.image,
+                }]);
+              } else {
+                setFileList([]);
+              }
               setEditModalOpen(true);
             }}
           >
@@ -581,6 +608,7 @@ export const InventoryPage = () => {
           setEditModalOpen(false);
           setSelectedProduct(null);
           form.resetFields();
+          setFileList([]);
         }}
         onOk={handleUpdateProduct}
         confirmLoading={actionLoading}
@@ -622,6 +650,22 @@ export const InventoryPage = () => {
               </Form.Item>
             </Col>
           </Row>
+          <Form.Item label="Product Image">
+            <Upload
+              listType="picture-card"
+              fileList={fileList}
+              beforeUpload={() => false}
+              onChange={({ fileList }) => setFileList(fileList.slice(-1))}
+              maxCount={1}
+            >
+              {fileList.length < 1 && (
+                <div>
+                  <PlusOutlined />
+                  <div style={{ marginTop: 8 }}>Upload</div>
+                </div>
+              )}
+            </Upload>
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -699,6 +743,16 @@ export const InventoryPage = () => {
       </Modal>
     </div>
   );
+};
+
+// Helper function to convert file to base64
+const getBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
 };
 
 export default InventoryPage;

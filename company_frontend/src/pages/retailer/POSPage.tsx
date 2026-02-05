@@ -31,6 +31,7 @@ import {
   CheckCircleOutlined,
   PrinterOutlined,
   DollarOutlined,
+  ShoppingCartOutlined,
 } from '@ant-design/icons';
 import { retailerApi } from '../../services/apiService';
 
@@ -491,7 +492,17 @@ const POSPage = () => {
                         style={{ backgroundColor: product.stock <= 5 ? '#f5222d' : '#faad14' }}
                       >
                         <div style={{ padding: '8px 0' }}>
-                          <div style={{ width: 60, height: 60, background: '#f0f0f0', margin: '0 auto 8px', borderRadius: 8 }} />
+                          {product.image ? (
+                            <img 
+                              src={product.image} 
+                              alt={product.name} 
+                              style={{ width: 60, height: 60, objectFit: 'cover', margin: '0 auto 8px', borderRadius: 8, display: 'block' }} 
+                            />
+                          ) : (
+                            <div style={{ width: 60, height: 60, background: '#f0f0f0', margin: '0 auto 8px', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <ShoppingCartOutlined style={{ fontSize: 24, color: '#ccc' }} />
+                            </div>
+                          )}
                           <Text strong style={{ display: 'block', fontSize: '13px' }}>{product.name}</Text>
                           <Text type="secondary" style={{ fontSize: '11px', display: 'block' }}>
                             {product.sku}
@@ -555,6 +566,19 @@ const POSPage = () => {
                       ]}
                     >
                       <List.Item.Meta
+                        avatar={
+                          item.image ? (
+                            <img 
+                              src={item.image} 
+                              alt={item.name} 
+                              style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} 
+                            />
+                          ) : (
+                            <div style={{ width: 40, height: 40, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <ShoppingCartOutlined style={{ fontSize: 20, color: '#ccc' }} />
+                            </div>
+                          )
+                        }
                         title={
                           <Text style={{ fontSize: '13px' }}>{item.name}</Text>
                         }

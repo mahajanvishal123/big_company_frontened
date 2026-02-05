@@ -47,6 +47,7 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total: number;
+  image?: string;
 }
 
 interface Order {
@@ -828,8 +829,27 @@ export const OrdersPage = () => {
               columns={[
                 {
                   title: 'Product',
-                  dataIndex: 'product_name',
                   key: 'product_name',
+                  render: (_, record) => (
+                    <Space>
+                      {record.image ? (
+                        <img 
+                          src={record.image} 
+                          alt={record.product_name} 
+                          style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }} 
+                        />
+                      ) : (
+                        <div style={{ width: 40, height: 40, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <ShoppingCartOutlined style={{ fontSize: 20, color: '#ccc' }} />
+                        </div>
+                      )}
+                      <div>
+                        <Text strong>{record.product_name}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 11 }}>SKU: {record.sku || 'N/A'}</Text>
+                      </div>
+                    </Space>
+                  ),
                 },
                 {
                   title: 'Qty',

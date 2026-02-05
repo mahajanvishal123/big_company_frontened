@@ -21,6 +21,7 @@ import {
   Badge,
   Alert,
   Tabs,
+  Upload,
 } from 'antd';
 import {
   SearchOutlined,
@@ -115,6 +116,7 @@ export const InventoryPage = () => {
   const [createModal, setCreateModal] = useState(false);
   const [createForm] = Form.useForm();
   const [createLoading, setCreateLoading] = useState(false);
+  const [fileList, setFileList] = useState<any[]>([]);
 
   useEffect(() => {
     loadProducts();
@@ -236,7 +238,7 @@ export const InventoryPage = () => {
     setCreateLoading(true);
     try {
       // Map form values to backend expectations
-      const payload = values.entry_type === 'manual' 
+      const payload: any = values.entry_type === 'manual' 
         ? {
             name: values.name,
             category: values.category,
@@ -249,11 +251,18 @@ export const InventoryPage = () => {
             invoice_number: values.invoice_number
           };
 
+      // Add image to payload if available
+      if (fileList.length > 0 && fileList[0].originFileObj) {
+        const base64 = await getBase64(fileList[0].originFileObj);
+        payload.image = base64;
+      }
+
       await retailerApi.createProduct(payload);
 
       message.success('Product created successfully');
       setCreateModal(false);
       createForm.resetFields();
+      setFileList([]);
       loadProducts();
     } catch (error: any) {
       message.error(error.response?.data?.error || 'Failed to create product');
@@ -786,6 +795,21 @@ export const InventoryPage = () => {
                     <Form.Item name="sku" label="SKU / Barcode (Optional)">
                       <Input placeholder="Scan or type code" prefix={<BarcodeOutlined />} />
                     </Form.Item>
+
+                    <Form.Item label="Product Image">
+                      <Upload.Dragger
+                        listType="picture"
+                        fileList={fileList}
+                        beforeUpload={() => false}
+                        onChange={({ fileList }) => setFileList(fileList.slice(-1))}
+                        maxCount={1}
+                      >
+                        <p className="ant-upload-drag-icon">
+                          <InboxOutlined />
+                        </p>
+                        <p className="ant-upload-text">Click or drag image to this area to upload</p>
+                      </Upload.Dragger>
+                    </Form.Item>
                   </>
                 ),
               },
@@ -810,6 +834,16 @@ export const InventoryPage = () => {
       `}</style>
     </div>
   );
+};
+
+// Helper function to convert file to base64
+const getBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = error => reject(error);
+  });
 };
 
 export default InventoryPage;

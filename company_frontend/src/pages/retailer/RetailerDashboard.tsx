@@ -679,9 +679,13 @@ export const RetailerDashboard: React.FC = () => {
                     <List.Item.Meta
                       avatar={
                         <Badge count={index + 1} style={{ backgroundColor: index < 3 ? '#fa541c' : '#d9d9d9' }}>
-                          <Avatar size={44} style={{ backgroundColor: '#1890ff' }}>
-                            {product.name.charAt(0)}
-                          </Avatar>
+                            {product.image ? (
+                              <Avatar size={44} src={product.image} />
+                            ) : (
+                              <Avatar size={44} style={{ backgroundColor: '#1890ff' }}>
+                                {product.name.charAt(0)}
+                              </Avatar>
+                            )}
                         </Badge>
                       }
                       title={
@@ -741,7 +745,11 @@ export const RetailerDashboard: React.FC = () => {
                       >
                         <List.Item.Meta
                           avatar={
-                            <Avatar size={40} style={{ backgroundColor: '#fa8c1615', color: '#fa8c16' }} icon={<InboxOutlined />} />
+                            item.image ? (
+                              <Avatar size={40} src={item.image} shape="square" />
+                            ) : (
+                              <Avatar size={40} style={{ backgroundColor: '#fa8c1615', color: '#fa8c16' }} icon={<InboxOutlined />} />
+                            )
                           }
                           title={<Text strong>{item.name}</Text>}
                           description={

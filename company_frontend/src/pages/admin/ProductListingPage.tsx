@@ -47,6 +47,7 @@ interface Product {
   status: 'active' | 'inactive';
   invoiceNumber: string;
   barcode: string;
+  image?: string;
 }
 
 export const ProductListingPage = () => {
@@ -140,11 +141,16 @@ export const ProductListingPage = () => {
       render: (_: any, record: Product) => (
         <Space>
           <div style={{ 
-            width: 32, height: 32, borderRadius: '50%', 
-            background: '#1890ff', display: 'flex', 
-            alignItems: 'center', justifyContent: 'center' 
+            width: 32, height: 32, borderRadius: '4px', 
+            overflow: 'hidden', display: 'flex', 
+            alignItems: 'center', justifyContent: 'center',
+            border: '1px solid #f0f0f0' 
           }}>
-            <ShoppingOutlined style={{ color: 'white', fontSize: 16 }} />
+            {record.image ? (
+              <img src={record.image} alt={record.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : (
+              <ShoppingOutlined style={{ color: '#1890ff', fontSize: 16 }} />
+            )}
           </div>
           <div>
             <Text strong style={{ display: 'block' }}>{record.name}</Text>

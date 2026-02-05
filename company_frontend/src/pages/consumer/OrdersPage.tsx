@@ -50,6 +50,7 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total: number;
+  image?: string;
 }
 
 interface Packager {
@@ -713,13 +714,28 @@ export const OrdersPage: React.FC = () => {
             </Title>
             <Space direction="vertical" style={{ width: '100%' }} size={8}>
               {selectedOrder.items.map((item) => (
-                <Row key={item.id} justify="space-between" align="middle">
+                <Row key={item.id} justify="space-between" align="middle" style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
                   <Col>
-                    <Text>{item.product_name}</Text>
-                    <br />
-                    <Text type="secondary">
-                      {formatPrice(item.unit_price)} x {item.quantity}
-                    </Text>
+                    <Space align="start">
+                      {item.image ? (
+                        <img 
+                          src={item.image} 
+                          alt={item.product_name} 
+                          style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 4, marginRight: 8 }} 
+                        />
+                      ) : (
+                        <div style={{ width: 48, height: 48, background: '#f5f5f5', borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                          <ShoppingOutlined style={{ fontSize: 24, color: '#ccc' }} />
+                        </div>
+                      )}
+                      <div>
+                        <Text strong>{item.product_name}</Text>
+                        <br />
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          {formatPrice(item.unit_price)} x {item.quantity}
+                        </Text>
+                      </div>
+                    </Space>
                   </Col>
                   <Col>
                     <Text strong>{formatPrice(item.total)}</Text>

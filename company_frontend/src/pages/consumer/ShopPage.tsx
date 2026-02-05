@@ -60,6 +60,7 @@ interface Product {
   price?: number; // Backend simple price
   stock?: number; // Backend stock
   category?: string; // Backend category
+  image?: string; // New Cloudinary image field
   variants?: Array<{
     id: string;
     title: string;
@@ -327,7 +328,7 @@ export const ShopPage: React.FC = () => {
         productId: p.id,
         name: p.name || p.title || 'Product',
         price: p.price,
-        image: p.thumbnail
+        image: p.image || p.thumbnail
       });
       message.success('Added!');
       return;
@@ -337,7 +338,7 @@ export const ShopPage: React.FC = () => {
     if (p.variants && p.variants.length > 0) {
       const v = p.variants[0];
       const price = v.prices.find(pr => pr.currency_code.toLowerCase() === 'rwf')?.amount || v.prices[0].amount;
-      addItem({ id: p.id, productId: p.id, name: p.title || p.name || 'Product', price, image: p.thumbnail });
+      addItem({ id: p.id, productId: p.id, name: p.title || p.name || 'Product', price, image: p.image || p.thumbnail });
       message.success('Added!');
     }
   };
@@ -566,7 +567,7 @@ export const ShopPage: React.FC = () => {
 
                   return (
                     <Col xs={12} md={8} lg={6} key={p.id}>
-                      <Card className="product-card" cover={<div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}><img src={p.thumbnail || 'https://via.placeholder.com/200'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /></div>}>
+                      <Card className="product-card" cover={<div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}><img src={p.image || p.thumbnail || 'https://via.placeholder.com/200'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} /></div>}>
                         <Text type="secondary" style={{ fontSize: 10, fontWeight: 700 }}>{categoryName}</Text>
                         <Title level={5} style={{ margin: '4px 0 12px', height: 44, overflow: 'hidden' }}>{productName}</Title>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
