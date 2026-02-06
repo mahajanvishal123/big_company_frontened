@@ -17,6 +17,7 @@ import {
   message,
   Tabs,
   Alert,
+  Empty,
 } from 'antd';
 import {
   WalletOutlined,
@@ -26,9 +27,11 @@ import {
   MobileOutlined,
   FileTextOutlined,
   ArrowUpOutlined,
+  DollarOutlined,
+  CheckOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
-import { consumerApi } from '../../services/apiService';
+import { consumerApi, nfcApi } from '../../services/apiService';
 
 const { Title, Text } = Typography;
 
@@ -88,11 +91,18 @@ const ConsumerWalletPage: React.FC = () => {
   const [creditInfo, setCreditInfo] = useState<CreditInfo | null>(null);
   const [creditOrders, setCreditOrders] = useState<CreditOrder[]>([]);
   const [creditApprovals, setCreditApprovals] = useState<CreditApproval[]>([]);
+  const [nfcCards, setNfcCards] = useState<any[]>([]);
+  const [activeLoans, setActiveLoans] = useState<any[]>([]);
   
   // Modals
   const [topUpModalVisible, setTopUpModalVisible] = useState(false);
   const [refundModalVisible, setRefundModalVisible] = useState(false);
   const [loanModalVisible, setLoanModalVisible] = useState(false);
+  const [repayModalVisible, setRepayModalVisible] = useState(false);
+  const [linkCardModalVisible, setLinkCardModalVisible] = useState(false);
+  const [topUpCardModalVisible, setTopUpCardModalVisible] = useState(false);
+  const [selectedLoan, setSelectedLoan] = useState<any>(null);
+  const [selectedCard, setSelectedCard] = useState<any>(null);
   
   const [activeTab, setActiveTab] = useState('transactions');
 
@@ -103,10 +113,11 @@ const ConsumerWalletPage: React.FC = () => {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [walletsRes, transactionsRes, loansRes] = await Promise.all([
+      const [walletsRes, transactionsRes, loansRes, nfcRes] = await Promise.all([
         consumerApi.getWallets(),
         consumerApi.getWalletTransactions({ limit: 50 }),
         consumerApi.getLoans(),
+        nfcApi.getMyCards(),
       ]);
 
       if (walletsRes.data.success) {
@@ -141,26 +152,32 @@ const ConsumerWalletPage: React.FC = () => {
 
       // Process Loans
       if (loansRes.data.loans) {
-           const activeLoans = loansRes.data.loans;
-           setCreditApprovals(activeLoans.map((l: any) => ({
-             id: l.id,
-             amount_requested: l.amount,
-             status: l.status,
-             submitted_at: l.createdAt,
-             reason: 'Loan Request'
-           })));
+            const loans = loansRes.data.loans;
+            setActiveLoans(loans);
+            setCreditApprovals(loans.map((l: any) => ({
+              id: l.id,
+              amount_requested: l.amount,
+              status: l.status,
+              submitted_at: l.createdAt,
+              reason: 'Loan Request'
+            })));
 
-           const usedCredit = activeLoans.reduce((sum: number, l: any) => sum + l.amount, 0);
-           const creditLimit = 50000;
+            const usedCredit = loans.reduce((sum: number, l: any) => sum + l.amount, 0);
+            const creditLimit = 50000;
 
-           setCreditInfo({
-             credit_limit: creditLimit,
-             available_credit: creditLimit - usedCredit,
-             used_credit: usedCredit,
-             outstanding_balance: usedCredit,
-             payment_status: 'current',
-             next_payment_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
-           });
+            setCreditInfo({
+              credit_limit: creditLimit,
+              available_credit: creditLimit - usedCredit,
+              used_credit: usedCredit,
+              outstanding_balance: usedCredit,
+              payment_status: 'current',
+              next_payment_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+            });
+      }
+
+      // Process NFC Cards
+      if (nfcRes.data.success) {
+        setNfcCards(nfcRes.data.data || []);
       }
 
     } catch (error) {
@@ -231,6 +248,67 @@ const ConsumerWalletPage: React.FC = () => {
        }
   };
 
+   const handleRepayLoan = async (values: any) => {
+        try {
+            setLoading(true);
+            await consumerApi.repayLoan(selectedLoan.id, {
+                amount: values.amount,
+                payment_method: values.payment_method || 'wallet'
+            });
+            message.success('Repayment successful');
+            setRepayModalVisible(false);
+            loadData();
+        } catch (error: any) {
+            message.error('Repayment failed');
+        } finally {
+            setLoading(false);
+        }
+   };
+
+   const handleLinkCard = async (values: any) => {
+        try {
+            setLoading(true);
+            await nfcApi.linkCard(values.uid, values.pin, values.nickname);
+            message.success('Card linked successfully');
+            setLinkCardModalVisible(false);
+            loadData();
+        } catch (error: any) {
+            message.error('Failed to link card');
+        } finally {
+            setLoading(false);
+        }
+   };
+
+   const handleTopUpCard = async (values: any) => {
+        try {
+            setLoading(true);
+            await nfcApi.topUpCard(selectedCard.id, {
+                amount: values.amount,
+                pin: values.pin
+            });
+            message.success('Card topped up successfully');
+            setTopUpCardModalVisible(false);
+            loadData();
+        } catch (error: any) {
+            message.error('Failed to top up card');
+        } finally {
+            setLoading(false);
+        }
+   };
+
+   const handleUnlinkCard = async (cardId: string) => {
+        try {
+            setLoading(true);
+            await nfcApi.unlinkCard(cardId);
+            message.success('Card unlinked successfully');
+            loadData();
+        } catch (error: any) {
+            message.error('Failed to unlink card');
+        } finally {
+            setLoading(false);
+        }
+   };
+
   const transactionColumns: ColumnsType<Transaction> = [
       {
         title: 'Date',
@@ -297,35 +375,119 @@ const ConsumerWalletPage: React.FC = () => {
   ];
 
   return (
-      <div style={{ padding: '16px' }} className="wallet-page">
-          <Row gutter={[16, 16]} align="middle" style={{ marginBottom: 24 }}>
-              <Col flex="auto">
-                  <Title level={3} style={{ margin: 0 }}>
-                      <WalletOutlined style={{ marginRight: 12 }} />
-                      Wallet
-                  </Title>
-                  <Text type="secondary">Manage your Dashboard and Credit balances</Text>
-              </Col>
-          </Row>
+      <div style={{ padding: '24px' }} className="wallet-page">
+          <div style={{ marginBottom: 32 }}>
+              <Title level={2} style={{ margin: 0, display: 'flex', alignItems: 'center' }}>
+                  <WalletOutlined style={{ marginRight: 16, color: '#333' }} />
+                  Wallet & Cards
+              </Title>
+              <Text type="secondary" style={{ fontSize: 16 }}>Manage your balances and NFC payment cards</Text>
+          </div>
 
-          <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
-               {/* Dashboard Balance */}
-               <Col xs={24} md={12}>
-                   <Card>
-                       <Statistic title="Dashboard Balance" value={balance?.dashboardBalance} precision={0} suffix="RWF" prefix={<WalletOutlined />} valueStyle={{color: '#1890ff'}} />
-                       <Space style={{marginTop: 16}}>
-                           <Button type="primary" onClick={() => setTopUpModalVisible(true)}>Top Up</Button>
-                           <Button onClick={() => setRefundModalVisible(true)}>Refund</Button>
+          <Row gutter={[24, 24]} style={{ marginBottom: 32 }}>
+               {/* Available Balance Summary Card */}
+               <Col xs={24} lg={8}>
+                   <Card 
+                       style={{ 
+                           height: '100%', 
+                           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                           borderRadius: 16,
+                           border: 'none',
+                           color: 'white',
+                           display: 'flex',
+                           flexDirection: 'column',
+                           justifyContent: 'center',
+                           minHeight: 180
+                       }}
+                       bodyStyle={{ padding: '24px' }}
+                   >
+                       <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14 }}>Available Balance</Text>
+                       <Title level={1} style={{ color: 'white', margin: '8px 0', fontSize: 36 }}>
+                           {(balance?.availableBalance || 0).toLocaleString()} RWF
+                       </Title>
+                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12 }}>Dashboard + Credit Balance</Text>
+                   </Card>
+               </Col>
+
+               {/* Dashboard Balance Card */}
+               <Col xs={24} sm={12} lg={8}>
+                   <Card 
+                       style={{ borderRadius: 16, height: '100%' }}
+                       bodyStyle={{ padding: '24px' }}
+                   >
+                       <Space align="start" style={{ marginBottom: 20 }}>
+                           <div style={{ background: '#e6f7ff', padding: 10, borderRadius: 8 }}>
+                               <WalletOutlined style={{ fontSize: 24, color: '#1890ff' }} />
+                           </div>
+                           <div>
+                               <Text type="secondary" style={{ fontSize: 12 }}>Dashboard Balance</Text>
+                               <Title level={3} style={{ margin: 0 }}>{(balance?.dashboardBalance || 0).toLocaleString()} RWF</Title>
+                               <Text style={{ fontSize: 11, color: '#8c8c8c' }}>Main wallet</Text>
+                           </div>
+                       </Space>
+                       
+                       <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                           <Button 
+                               type="primary" 
+                               icon={<PlusOutlined />} 
+                               block 
+                               size="large"
+                               style={{ borderRadius: 8 }}
+                               onClick={() => setTopUpModalVisible(true)}
+                           >
+                               Top Up
+                           </Button>
+                           <Button 
+                               icon={<ArrowUpOutlined />} 
+                               block 
+                               size="large"
+                               style={{ borderRadius: 8 }}
+                               onClick={() => setRefundModalVisible(true)}
+                           >
+                               Request Refund
+                           </Button>
                        </Space>
                    </Card>
                </Col>
-               {/* Credit Balance */}
-               <Col xs={24} md={12}>
-                   <Card>
-                       <Statistic title="Credit Balance" value={balance?.creditBalance} precision={0} suffix="RWF" prefix={<CreditCardOutlined />} valueStyle={{color: '#52c41a'}} />
-                       <div style={{marginTop: 16}}>
-                          <Button onClick={() => setLoanModalVisible(true)}>Request Loan</Button>
-                       </div>
+
+               {/* Credit Balance Card */}
+               <Col xs={24} sm={12} lg={8}>
+                   <Card 
+                       style={{ borderRadius: 16, height: '100%' }}
+                       bodyStyle={{ padding: '24px' }}
+                   >
+                       <Space align="start" style={{ marginBottom: 20 }}>
+                           <div style={{ background: '#f6ffed', padding: 10, borderRadius: 8 }}>
+                               <CreditCardOutlined style={{ fontSize: 24, color: '#52c41a' }} />
+                           </div>
+                           <div>
+                               <Text type="secondary" style={{ fontSize: 12 }}>Credit Balance</Text>
+                               <Title level={3} style={{ margin: 0 }}>{(balance?.creditBalance || 0).toLocaleString()} RWF</Title>
+                               <Text style={{ fontSize: 11, color: '#8c8c8c' }}>Available credit</Text>
+                           </div>
+                       </Space>
+
+                       <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                           <Button 
+                               type="primary" 
+                               icon={<PlusOutlined />} 
+                               block 
+                               size="large"
+                               style={{ borderRadius: 8, background: '#1890ff' }}
+                               onClick={() => setLoanModalVisible(true)}
+                           >
+                               Request Loan
+                           </Button>
+                           <Button 
+                               icon={<FileTextOutlined />} 
+                               block 
+                               size="large"
+                               style={{ borderRadius: 8 }}
+                               onClick={() => window.location.href = '/consumer/credit-ledger'}
+                           >
+                               View Details
+                           </Button>
+                       </Space>
                    </Card>
                </Col>
           </Row>
@@ -358,7 +520,82 @@ const ConsumerWalletPage: React.FC = () => {
                                   pagination={{ pageSize: 10 }}
                               />
                           )
-                      }
+                      },
+                       {
+                           key: 'cards',
+                           label: <span><CreditCardOutlined /> My NFC Cards ({nfcCards.length}/3)</span>,
+                           children: (
+                               <div style={{ padding: '24px 0' }}>
+                                   <Row gutter={[24, 24]}>
+                                       {nfcCards.map(card => (
+                                           <Col xs={24} sm={12} md={8} key={card.id}>
+                                               <Card 
+                                                   style={{ 
+                                                       borderRadius: 16,
+                                                       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                                                       color: 'white',
+                                                       border: 'none',
+                                                       position: 'relative',
+                                                       overflow: 'hidden',
+                                                       minHeight: 180
+                                                   }}
+                                                   bodyStyle={{ padding: '24px' }}
+                                               >
+                                                   <div style={{ position: 'absolute', top: 20, right: 20 }}>
+                                                       <Tag color="#1890ff" style={{ border: 'none', borderRadius: 4, fontWeight: 'bold' }}>Primary</Tag>
+                                                   </div>
+                                                   <CreditCardOutlined style={{ fontSize: 32, marginBottom: 20, opacity: 0.8 }} />
+                                                   <div>
+                                                       <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 12, display: 'block' }}>NFC Card ({card.uid.slice(-4)})</Text>
+                                                       <Title level={4} style={{ color: 'white', margin: '4px 0' }}>{card.nickname || `NFC-${card.uid.slice(-4)}`}</Title>
+                                                   </div>
+                                                   <div style={{ marginTop: 24, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                                                       <div>
+                                                           <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 11 }}>Balance</Text>
+                                                           <div style={{ fontSize: 20, fontWeight: 'bold' }}>{card.balance.toLocaleString()} RWF</div>
+                                                       </div>
+                                                       <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10 }}>UID: {card.uid}</Text>
+                                                   </div>
+                                               </Card>
+                                           </Col>
+                                       ))}
+                                       {nfcCards.length < 3 && (
+                                           <Col xs={24} sm={12} md={8}>
+                                               <div 
+                                                   onClick={() => setLinkCardModalVisible(true)}
+                                                   style={{
+                                                       height: '100%',
+                                                       minHeight: 180,
+                                                       border: '2px dashed #d9d9d9',
+                                                       borderRadius: 16,
+                                                       display: 'flex',
+                                                       flexDirection: 'column',
+                                                       alignItems: 'center',
+                                                       justifyContent: 'center',
+                                                       cursor: 'pointer',
+                                                       transition: 'all 0.3s'
+                                                   }}
+                                                   className="link-card-placeholder"
+                                               >
+                                                   <PlusOutlined style={{ fontSize: 32, color: '#8c8c8c', marginBottom: 12 }} />
+                                                   <Text style={{ color: '#8c8c8c', fontWeight: 500 }}>Link New Card</Text>
+                                               </div>
+                                           </Col>
+                                       )}
+                                   </Row>
+                               </div>
+                           )
+                       },
+                       {
+                           key: 'dashboard_ledger',
+                           label: <span><FileTextOutlined /> Dashboard Ledger</span>,
+                           children: <div style={{ padding: '24px 0' }}><Table columns={transactionColumns} dataSource={transactions.filter(t => t.balance_type === 'dashboard')} rowKey="id" pagination={{ pageSize: 10 }} /></div>
+                       },
+                       {
+                           key: 'credit_ledger',
+                           label: <span><DollarOutlined /> Credit Ledger</span>,
+                           children: <div style={{ padding: '24px 0' }}><Table columns={transactionColumns} dataSource={transactions.filter(t => t.balance_type === 'credit')} rowKey="id" pagination={{ pageSize: 10 }} /></div>
+                       }
                   ]}
               />
           </Card>
@@ -398,6 +635,50 @@ const ConsumerWalletPage: React.FC = () => {
                       <Input />
                   </Form.Item>
                   <Button type="primary" htmlType="submit" loading={loading} block>Apply</Button>
+               </Form>
+          </Modal>
+
+          <Modal title="Repay Loan" open={repayModalVisible} onCancel={() => setRepayModalVisible(false)} footer={null}>
+               <Form onFinish={handleRepayLoan} layout="vertical">
+                  <Title level={5}>Loan Amount: {selectedLoan?.amount?.toLocaleString()} RWF</Title>
+                  <Form.Item name="amount" label="Repayment Amount" rules={[{ required: true }]}>
+                      <InputNumber style={{ width: '100%' }} min={100} max={selectedLoan?.amount} />
+                  </Form.Item>
+                  <Form.Item name="payment_method" label="Source" initialValue="wallet">
+                      <Select>
+                          <Select.Option value="wallet">Main Wallet</Select.Option>
+                          <Select.Option value="mobile_money">Mobile Money</Select.Option>
+                      </Select>
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" loading={loading} block>Repay</Button>
+               </Form>
+          </Modal>
+
+          <Modal title="Link NFC Card" open={linkCardModalVisible} onCancel={() => setLinkCardModalVisible(false)} footer={null}>
+               <Form onFinish={handleLinkCard} layout="vertical">
+                  <Form.Item name="uid" label="Card UID" rules={[{ required: true }]}>
+                      <Input placeholder="Enter 8 or 14 digit UID" />
+                  </Form.Item>
+                  <Form.Item name="pin" label="Card PIN" rules={[{ required: true }]}>
+                      <Input.Password maxLength={4} placeholder="4 digit PIN" />
+                  </Form.Item>
+                  <Form.Item name="nickname" label="Card Nickname">
+                      <Input placeholder="e.g. My Main Card" />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" loading={loading} block>Link Card</Button>
+               </Form>
+          </Modal>
+
+          <Modal title="Top Up NFC Card" open={topUpCardModalVisible} onCancel={() => setTopUpCardModalVisible(false)} footer={null}>
+               <Form onFinish={handleTopUpCard} layout="vertical">
+                  <Title level={5}>Card: {selectedCard?.nickname || selectedCard?.uid}</Title>
+                  <Form.Item name="amount" label="Top Up Amount" rules={[{ required: true }]}>
+                      <InputNumber style={{ width: '100%' }} min={100} />
+                  </Form.Item>
+                  <Form.Item name="pin" label="Card PIN" rules={[{ required: true }]}>
+                      <Input.Password maxLength={4} placeholder="4 digit PIN" />
+                  </Form.Item>
+                  <Button type="primary" htmlType="submit" loading={loading} block>Top Up</Button>
                </Form>
           </Modal>
       </div>

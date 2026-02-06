@@ -86,7 +86,7 @@ const POSPage = () => {
   const [processing, setProcessing] = useState(false);
 
   // Big Shop Card payment flow
-  const [cardStep, setCardStep] = useState<'tap' | 'pin' | 'wallet_choice' | 'meter_id'>('tap');
+  const [cardStep, setCardStep] = useState<'tap' | 'pin' | 'wallet_choice' | 'reward_id'>('tap');
   const [cardWalletType, setCardWalletType] = useState<'dashboard' | 'credit'>('dashboard');
   const [cardPin, setCardPin] = useState('');
 
@@ -98,8 +98,8 @@ const POSPage = () => {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
 
-  // Gas Meter ID for rewards
-  const [gasMeterID, setGasMeterID] = useState('');
+  // Gas Reward Wallet ID for rewards
+  const [gasRewardWalletId, setGasRewardWalletId] = useState('');
 
   // Daily stats
   const [dailyStats, setDailyStats] = useState<DailySalesStats | null>(null);
@@ -282,7 +282,7 @@ const POSPage = () => {
         payment_method: method as 'dashboard_wallet' | 'credit_wallet' | 'mobile_money',
         customer_phone: customer?.phone || customerPhone || undefined,
         discount: discountAmount > 0 ? discountAmount : undefined,
-        gas_meter_id: paymentDetails?.gas_meter_id || gasMeterID || undefined,
+        gasRewardWalletId: paymentDetails?.gasRewardWalletId || gasRewardWalletId || undefined,
         payment_details: paymentDetails,
       };
 
@@ -298,7 +298,7 @@ const POSPage = () => {
           discount: discountAmount,
           total,
           method,
-          gas_meter_id: paymentDetails?.gas_meter_id || gasMeterID,
+          gasRewardWalletId: paymentDetails?.gasRewardWalletId || gasRewardWalletId,
         });
 
         // Reset state
@@ -309,7 +309,7 @@ const POSPage = () => {
         setCustomerPhone('');
         setCardStep('tap');
         setCardPin('');
-        setGasMeterID('');
+        setGasRewardWalletId('');
 
         // Show receipt
         setReceiptModal(true);
@@ -343,7 +343,7 @@ const POSPage = () => {
         paymentDetails = {
           card_pin: cardPin,
           wallet_type: cardWalletType,
-          gas_meter_id: cardWalletType === 'dashboard' ? gasMeterID : undefined,
+          gasRewardWalletId: cardWalletType === 'dashboard' ? gasRewardWalletId : undefined,
         };
         break;
 
@@ -356,7 +356,7 @@ const POSPage = () => {
         paymentDetails = {
           provider: mobileProvider,
           phone: customerPhone,
-          gas_meter_id: gasMeterID || undefined,
+          gasRewardWalletId: gasRewardWalletId || undefined,
         };
         // Simulate mobile money request
         message.loading('Sending payment request to customer...', 2);
@@ -685,7 +685,7 @@ const POSPage = () => {
           setPaymentModal(false);
           setCardStep('tap');
           setCardPin('');
-          setGasMeterID('');
+          setGasRewardWalletId('');
         }}
         footer={null}
         width={500}
@@ -704,10 +704,9 @@ const POSPage = () => {
           value={paymentMethod}
           onChange={(e) => {
             setPaymentMethod(e.target.value);
-            setCustomer(null);
             setCardStep('tap');
             setCardPin('');
-            setGasMeterID('');
+            setGasRewardWalletId('');
           }}
           style={{ width: '100%', marginBottom: 24 }}
         >
@@ -815,7 +814,7 @@ const POSPage = () => {
                   style={{ marginTop: 16 }}
                   onClick={() => {
                     if (cardWalletType === 'dashboard') {
-                      setCardStep('meter_id');
+                      setCardStep('reward_id');
                     } else {
                       // Credit wallet - no gas rewards, proceed to payment
                       handlePayment();
@@ -827,17 +826,17 @@ const POSPage = () => {
               </div>
             )}
 
-            {cardStep === 'meter_id' && (
+            {cardStep === 'reward_id' && (
               <div style={{ padding: '20px 0' }}>
-                <Title level={5} style={{ textAlign: 'center', marginBottom: 16 }}>Enter Gas Meter ID</Title>
+                <Title level={5} style={{ textAlign: 'center', marginBottom: 16 }}>Enter Gas Reward Wallet ID</Title>
                 <Text type="secondary" style={{ display: 'block', textAlign: 'center', marginBottom: 16 }}>
                   Required for Dashboard Wallet (Gas Rewards Eligible)
                 </Text>
                 <Input
                   size="large"
-                  placeholder="Meter ID (e.g. MTR-12345)"
-                  value={gasMeterID}
-                  onChange={(e) => setGasMeterID(e.target.value)}
+                  placeholder="Gas Reward Wallet ID (GRW-...)"
+                  value={gasRewardWalletId}
+                  onChange={(e) => setGasRewardWalletId(e.target.value)}
                   style={{ textAlign: 'center' }}
                 />
                 <Button
@@ -845,7 +844,7 @@ const POSPage = () => {
                   size="large"
                   block
                   style={{ marginTop: 16 }}
-                  disabled={!gasMeterID}
+                  disabled={!gasRewardWalletId}
                   onClick={handlePayment}
                 >
                   Complete Payment
@@ -893,10 +892,10 @@ const POSPage = () => {
 
             <Input
               size="large"
-              placeholder="Gas Meter ID for rewards"
-              value={gasMeterID}
-              onChange={(e) => setGasMeterID(e.target.value)}
-              prefix={<span style={{ color: '#fa541c' }}>🔥</span>}
+              placeholder="Gas Reward Wallet ID (Optional)"
+              value={gasRewardWalletId}
+              onChange={(e) => setGasRewardWalletId(e.target.value)}
+              prefix={<span style={{ color: '#fa541c' }}>🎁</span>}
               style={{ marginBottom: 16 }}
             />
             <Text type="secondary" style={{ display: 'block', marginBottom: 16, fontSize: 12 }}>
@@ -994,10 +993,10 @@ const POSPage = () => {
               <Title level={4} style={{ margin: 0 }}>Total:</Title>
               <Title level={4} style={{ margin: 0 }}>{lastSale.total?.toLocaleString()} RWF</Title>
             </Row>
-            {lastSale.gas_meter_id && (
+            {lastSale.gasRewardWalletId && (
               <Row justify="space-between" style={{ marginTop: 8 }}>
-                <Text type="secondary">Gas Rewards Meter:</Text>
-                <Text type="secondary">{lastSale.gas_meter_id}</Text>
+                <Text type="secondary">Gas Reward Wallet:</Text>
+                <Text type="secondary">{lastSale.gasRewardWalletId}</Text>
               </Row>
             )}
 

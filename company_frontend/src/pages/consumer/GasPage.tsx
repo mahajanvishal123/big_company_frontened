@@ -108,6 +108,8 @@ export const GasPage: React.FC = () => {
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState<number | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'mobile_money'>('wallet');
+  const [paymentSubOption, setPaymentSubOption] = useState<'dashboard' | 'credit'>('dashboard');
+  const [creditBalance, setCreditBalance] = useState(0);
   const [selectedCardId, setSelectedCardId] = useState<number | null>(null);
   const [topupResult, setTopupResult] = useState<any>(null);
   const [safetyChecking, setSafetyChecking] = useState<string | null>(null);
@@ -200,6 +202,8 @@ export const GasPage: React.FC = () => {
       if (walletsRes.data.success && Array.isArray(walletsRes.data.data)) {
         const dashboardWallet = walletsRes.data.data.find((w: any) => w.type === 'dashboard_wallet');
         setBalance(dashboardWallet?.balance || 0);
+        const creditWallet = walletsRes.data.data.find((w: any) => w.type === 'credit_wallet');
+        setCreditBalance(creditWallet?.balance || 0);
       }
 
       // Get NFC cards
@@ -264,9 +268,12 @@ export const GasPage: React.FC = () => {
       return;
     }
 
-    if (paymentMethod === 'wallet' && balance < selectedAmount) {
-      message.error('Insufficient dashboard balance. Please top up your wallet first.');
-      return;
+    if (paymentMethod === 'wallet') {
+      const activeBalance = paymentSubOption === 'dashboard' ? balance : creditBalance;
+      if (activeBalance < selectedAmount) {
+        message.error(`Insufficient ${paymentSubOption} wallet balance. Please top up first.`);
+        return;
+      }
     }
 
 
@@ -276,23 +283,29 @@ export const GasPage: React.FC = () => {
       const response = await consumerApi.topupGas({
         meter_number: selectedMeter.meter_number,
         amount: selectedAmount,
-        payment_method: paymentMethod,
+        payment_method: paymentMethod === 'wallet' 
+          ? (paymentSubOption === 'dashboard' ? 'wallet' : 'credit_wallet')
+          : 'mobile_money',
         card_id: selectedCardId,
       });
 
       if (response.data.success) {
         const result = response.data.data;
         const methodLabels = {
-          wallet: 'Dashboard Balance',
+          wallet: 'Dashboard Wallet',
+          credit_wallet: 'Credit Wallet',
           mobile_money: 'Mobile Money'
         };
+        const activeMethod = paymentMethod === 'wallet' 
+          ? (paymentSubOption === 'dashboard' ? 'wallet' : 'credit_wallet')
+          : 'mobile_money';
 
         setTopupResult({
           meter_number: result.meter_number,
           units: Number(result.units).toFixed(2),
           token: result.token,
           amount: result.amount,
-          payment_method: methodLabels[paymentMethod],
+          payment_method: methodLabels[activeMethod as keyof typeof methodLabels],
         });
 
         setBalance(result.new_wallet_balance);
@@ -546,12 +559,12 @@ export const GasPage: React.FC = () => {
             </Space>
           </Col>
           <Col>
-            <Space direction="vertical" align="end">
-              <Text style={{ color: 'rgba(255,255,255,0.85)', display: 'block', fontSize: 12 }}>
-                Dashboard Balance
+            <Space direction="vertical" align="end" size={0}>
+              <Text style={{ color: 'rgba(255,255,255,0.85)', display: 'block', fontSize: 11 }}>
+                Dashboard: <span style={{ fontWeight: 'bold', color: 'white' }}>{formatPrice(balance)}</span>
               </Text>
-              <Text style={{ color: 'white', fontSize: 20, fontWeight: 'bold' }}>
-                {formatPrice(balance)}
+              <Text style={{ color: 'rgba(255,255,255,0.85)', display: 'block', fontSize: 11 }}>
+                Credit: <span style={{ fontWeight: 'bold', color: 'white' }}>{formatPrice(creditBalance)}</span>
               </Text>
             </Space>
           </Col>
@@ -928,27 +941,29 @@ export const GasPage: React.FC = () => {
               >
                 <Space direction="vertical" style={{ width: '100%' }}>
                   <Radio value="wallet" style={{ width: '100%' }}>
-                    <Card size="small" style={{ margin: '8px 0' }}>
-                      <Space>
-                        <WalletOutlined style={{ fontSize: 24, color: '#1890ff' }} />
-                        <div>
-                          <Text strong>Dashboard Balance</Text>
-                          <br />
-                          <Text type="secondary">Available: {formatPrice(balance)}</Text>
-                          {balance < (selectedAmount || 300) && (
-                            <Button
-                              type="link"
-                              size="small"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleMockTopup();
-                              }}
-                              style={{ padding: '0 8px' }}
+                    <Card size="small" style={{ margin: '8px 0', borderColor: paymentMethod === 'wallet' ? '#ff7300' : '#f0f0f0' }}>
+                      <Space direction="vertical" style={{ width: '100%' }}>
+                        <Space>
+                          <WalletOutlined style={{ fontSize: 24, color: '#ff7300' }} />
+                          <Text strong>Big Wallet</Text>
+                        </Space>
+                        {paymentMethod === 'wallet' && (
+                          <div style={{ paddingLeft: 32 }}>
+                            <Radio.Group 
+                              value={paymentSubOption} 
+                              onChange={e => setPaymentSubOption(e.target.value)}
                             >
-                              Top up
-                            </Button>
-                          )}
-                        </div>
+                              <Space direction="vertical">
+                                <Radio value="dashboard">
+                                  Dashboard Balance: <Text strong>{formatPrice(balance)}</Text>
+                                </Radio>
+                                <Radio value="credit">
+                                  Credit Balance: <Text strong>{formatPrice(creditBalance)}</Text>
+                                </Radio>
+                              </Space>
+                            </Radio.Group>
+                          </div>
+                        )}
                       </Space>
                     </Card>
                   </Radio>
